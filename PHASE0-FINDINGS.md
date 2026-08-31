@@ -3,9 +3,13 @@
 Resolved by decompiling the shipped assemblies (Mono build, real .NET — `ilspycmd` over
 `Big Ambitions_Data/Managed/*.dll`). Build version tally date 2026-08-29.
 
+**The whole mod compiles clean (0 warnings, 0 errors) against the real game + Unity assemblies**
+via `build/CompileCheck.csproj` — domain, runtime, UI, interop, player-scheduling, and the probe.
+So every type/method/field referenced below is real and correctly used.
+
 **In-game verification still outstanding** (needs Unity 2022.3.62f2 + a running save): whether
-the sim *honours* a mod-written task/shift the same frame, and whether `ScheduleAutoFiller` is
-safely callable from a mod. Types and signatures below are confirmed from source.
+the sim *honours* a mod-written task/shift the same frame; the exact staffing input to
+`ScheduleAutoFiller`; the wholesale purchase path; a few field names behind `// VERIFY`.
 
 ## Assemblies & namespaces
 
@@ -86,10 +90,31 @@ int startingHour;  int endingHour;  string employeeId;  string itemInstanceId;  
 
 ### `Buildings.Schedule.ScheduleAutoFiller`   ← D5, the OR-Tools scheduler
 ```
-ctor(List<WorkStationInfo>, List<EmployeeInstance>, SchedulePartitioner, ...)   // exact ctor TBD in-game
+ctor(List<EmployeeInstance> employees, BuildingRegistration registration, ScheduleDay day = null)
+void FillWithEmployees()          // run on a background thread (ScheduleAutoFillerHelper does `new Thread(...).Start()`)
 UnityEvent<ScheduleAutoFiller,float> onProgress;   UnityEvent<ScheduleAutoFiller,bool> onCompleted;
-bool fast;  List<EmployeeInstance> Employees;  List<EmployeeInstance> UnassignedEmployees;
-// runs CpModel/CpSolver from Google.OrTools.Sat, 5s/run, 3 workers
+bool fast;  bool inhibitSuccessNotification;  List<EmployeeInstance> Employees / UnassignedEmployees;
+// CpModel/CpSolver from Google.OrTools.Sat, 5s/run, 3 workers.
+// Helper: `registration.AutoFillSchedule(...)` — same thing but UI-coupled; call the filler directly instead.
+```
+
+### `Entities.BuildingRegistration` (more)
+```
+string BusinessName;                          Satisfaction satisfaction;   // { customerService, pricing, cleanliness, facility, overall } ints
+List<float> dailyIncomes;   float GetAvgDailyIncome(int days);   float GetAvgWeeklyIncome();
+bool RentedByPlayer;  bool BuildingOwnedByPlayer;
+```
+
+### time — `Helpers.TimeHelper`  (no DateTime; the game uses int day)
+```
+int CurrentDay  (SaveGameManager.Current.Day);  int CurrentHour;  float CurrentMinute;
+DayOfWeekOrdered GetDayOfWeek();  int GetDayOfWeekIndex(DayOfWeekOrdered);  DayOfWeekOrdered GetNextDayOfWeek();
+```
+
+### money — `TransactionInfo`
+```
+new TransactionInfo(string type, Dictionary<string,string> data, bool isTaxDeductible = false)   // type is a "ba:transaction_*" string
+GameManager.ChangeMoneySafe(float amount, TransactionInfo, int? day = null, Address = null, bool force = false, bool showNotification = false) → bool
 ```
 
 ## Decisions this locks / changes

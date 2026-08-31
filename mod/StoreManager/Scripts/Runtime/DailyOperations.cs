@@ -64,8 +64,8 @@ namespace StoreManager.Runtime
             // D5: delegate to the game's own scheduler rather than composing shifts by hand.
             _game.RunGameScheduler(store, data.Policy.StaffingMultiplier);
 
-            var tomorrow = _game.CurrentDate.AddDays(1);
-            var shifts = _game.GetShifts(store, tomorrow).ToList();
+            var tomorrowDow = (_game.CurrentDayOfWeekIndex + 1) % 7;
+            var shifts = _game.GetShifts(store, tomorrowDow).ToList();
             data.CurrentWeek.ShiftsTotal += Math.Max(shifts.Count, 1);
             data.CurrentWeek.ShiftsCovered += shifts.Count;
         }

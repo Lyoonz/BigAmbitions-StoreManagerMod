@@ -54,6 +54,8 @@ Static decompile done (2026-08-31). **In-game probe run still pending** — need
 - [ ] **CONDITIONAL GO (D2)** — needs bundled Harmony for: ______
 - [ ] **NO-GO / RE-SCOPE** — task assignment not honoured by the sim → numbers-only manager.
 
-Static verdict so far: **leaning GO.** Every type is public in a referenced assembly; no
-reflection or patching needed in `GameBindingsLive` yet. The only real risk is behavioural
-(does the sim keep a mod-set task/shift), which only an in-game run settles.
+Static verdict: **GO (pending one behavioural check).** The entire mod + probe compile clean
+(0 warnings, 0 errors) against the real game + Unity DLLs — every type, method and field is
+real and correctly used. No reflection or Harmony needed. The only open risk is behavioural:
+does the sim keep a mod-set task/shift? Probes #1/#2 settle that. Everything else behind
+`// VERIFY` is a field-name or overload confirmation, not a design risk.

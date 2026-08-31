@@ -80,9 +80,8 @@ namespace StoreManager.Runtime
 
         private Random DeterministicRngForToday()
         {
-            // Stable across a save reload: seed = store seed XOR day-of-year.
-            var doy = _game.CurrentDate.DayOfYear;
-            return new Random(_data.MistakeSeed ^ doy);
+            // Stable across a save reload: seed = store seed XOR game day.
+            return new Random(_data.MistakeSeed ^ _game.CurrentDay);
         }
     }
 }

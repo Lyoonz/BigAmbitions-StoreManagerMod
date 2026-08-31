@@ -30,3 +30,7 @@ ModsLocal/
 Thumbs.db
 .idea/
 .vs/
+
+# Build check output
+build/bin/
+build/obj/

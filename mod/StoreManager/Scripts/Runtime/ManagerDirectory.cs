@@ -28,7 +28,7 @@ namespace StoreManager.Runtime
             var json = _game.LoadModData(SaveKey);
             if (string.IsNullOrEmpty(json)) return;
 
-            foreach (var record in Serialization.DeserializeList(json))
+            foreach (var record in Serialization.DeserializeList(json!))
             {
                 var store = _game.FindStore(record.StoreId);
                 if (store.HasValue)

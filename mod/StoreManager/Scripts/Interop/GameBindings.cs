@@ -9,7 +9,6 @@ using Entities;                               // EmployeeInstance, BuildingRegis
 using Helpers;                                // EmployeeHelper
 using AI.Employees;                           // Complaint, ComplaintHelper
 using Buildings.Schedule;                     // ScheduleAutoFiller
-using BigAmbitions.DayNightCycle;             // TimeHelper, Timestamp
 using Player.DifficultySettings;              // Difficulty
 
 namespace StoreManager.Interop
@@ -40,7 +39,7 @@ namespace StoreManager.Interop
     public sealed class ShiftSpec
     {
         public GameRef Employee;
-        public DateTime Date;
+        public int DayOfWeekIndex;              // 0..6, game DayOfWeekOrdered index (TimeHelper.GetDayOfWeekIndex)
         public int StartHour;
         public int EndHour;
         public StationKind Station;
@@ -50,8 +49,8 @@ namespace StoreManager.Interop
     public sealed class LeaveRequest
     {
         public GameRef Employee;
-        public DateTime From;
-        public DateTime To;
+        public int FromDay;
+        public int ToDay;
         public bool CoverArranged;
     }
 
@@ -59,7 +58,10 @@ namespace StoreManager.Interop
     {
         event Action? DayElapsed;
         event Action? WeekElapsed;
-        DateTime CurrentDate { get; }
+        /// <summary>Game day counter (SaveGameManager.Current.Day), not a calendar date.</summary>
+        int CurrentDay { get; }
+        /// <summary>0..6 index of today's DayOfWeekOrdered.</summary>
+        int CurrentDayOfWeekIndex { get; }
 
         GameDifficulty GetDifficulty();
 
@@ -78,7 +80,7 @@ namespace StoreManager.Interop
         void AssignTask(GameRef employee, StationKind station);
         StationKind? GetAssignedTask(GameRef employee);
 
-        IEnumerable<ShiftSpec> GetShifts(GameRef store, DateTime date);
+        IEnumerable<ShiftSpec> GetShifts(GameRef store, int dayOfWeekIndex);
         void AddShift(GameRef store, ShiftSpec shift);
         void RemoveShift(GameRef store, ShiftSpec shift);
         void RunGameScheduler(GameRef store, double targetStaffingMultiplier);
@@ -138,26 +140,25 @@ namespace StoreManager.Interop
         private void OnNewDay()
         {
             DayElapsed?.Invoke();
-            var week = CurrentDate.DayOfYear / 7;
-            if (week != _lastWeekIndex)
-            {
-                _lastWeekIndex = week;
+            var dow = CurrentDayOfWeekIndex;
+            if (_lastWeekIndex >= 0 && dow < _lastWeekIndex)   // week wrapped (e.g. Sun→Mon)
                 WeekElapsed?.Invoke();
-            }
+            _lastWeekIndex = dow;
         }
 
         // ── time ────────────────────────────────────────────────────────────────
-        public DateTime CurrentDate => TimeHelper.Now().ToDateTime();   // VERIFY: Timestamp→DateTime accessor name
+        public int CurrentDay => TimeHelper.CurrentDay;
+        public int CurrentDayOfWeekIndex => TimeHelper.GetDayOfWeekIndex(TimeHelper.GetDayOfWeek());
 
         // ── difficulty ──────────────────────────────────────────────────────────
         public GameDifficulty GetDifficulty()
         {
-            // VERIFY: GameVariables accessor. Likely SaveGameManager.Current.gameVariables.difficulty.
+            // VERIFY: GameVariables accessor + Easy/Hard enum member names (decompile shows Normal, Custom).
             var d = SaveGameManager.Current.gameVariables.difficulty;
-            return d switch
+            return d.ToString().ToLowerInvariant() switch
             {
-                Difficulty.Easy => GameDifficulty.Easy,     // VERIFY enum member names (source shows Normal, Custom)
-                Difficulty.Hard => GameDifficulty.Hard,
+                "easy" => GameDifficulty.Easy,
+                "hard" => GameDifficulty.Hard,
                 _ => GameDifficulty.Normal,
             };
         }
@@ -168,7 +169,7 @@ namespace StoreManager.Interop
                 .Where(b => b.RentedByPlayer || b.BuildingOwnedByPlayer)
                 .Where(b => b.businessTypeName != "ba:businesstype_empty"
                          && b.businessTypeName != "ba:businesstype_headquarters")
-                .Select(b => new GameRef(b.Address.ToString(), b.businessTypeName, b));
+                .Select(b => new GameRef(b.Address.ToString(), b.BusinessName, b));
 
         public GameRef? FindStore(string storeId) =>
             GetPlayerStores().Cast<GameRef?>().FirstOrDefault(s => s!.Value.Id == storeId);
@@ -176,14 +177,13 @@ namespace StoreManager.Interop
         public decimal GetDailyRevenue(GameRef store)
         {
             var b = store.As<BuildingRegistration>();
-            // VERIFY: per-store daily revenue field. Candidate: b.RetailSimulation / EconoView aggregation.
-            return b == null ? 0m : (decimal)0m;
+            return b == null ? 0m : (decimal)b.GetAvgDailyIncome(1);
         }
 
         public double GetReputation(GameRef store)
         {
             var b = store.As<BuildingRegistration>();
-            return b == null ? 0d : 0d;   // VERIFY: reputation field on BuildingRegistration / retail sim
+            return b?.satisfaction?.overall ?? 0d;   // Satisfaction { customerService, pricing, cleanliness, facility, overall }
         }
 
         // ── employees ───────────────────────────────────────────────────────────
@@ -246,16 +246,16 @@ namespace StoreManager.Interop
         }
 
         // ── scheduling ──────────────────────────────────────────────────────────
-        public IEnumerable<ShiftSpec> GetShifts(GameRef store, DateTime date)
+        public IEnumerable<ShiftSpec> GetShifts(GameRef store, int dayOfWeekIndex)
         {
             var b = store.As<BuildingRegistration>();
             if (b == null) yield break;
-            var day = b.scheduleDays[((int)date.DayOfWeek + 6) % 7];   // VERIFY: DayOfWeekOrdered index base
+            var day = b.scheduleDays[dayOfWeekIndex];
             foreach (var s in day.workShifts)
                 yield return new ShiftSpec
                 {
                     Employee = FindEmployee(s.employeeId) ?? default,
-                    Date = date,
+                    DayOfWeekIndex = dayOfWeekIndex,
                     StartHour = s.startingHour,
                     EndHour = s.endingHour,
                     StationItemInstanceId = s.itemInstanceId,
@@ -266,7 +266,7 @@ namespace StoreManager.Interop
         {
             var b = store.As<BuildingRegistration>();
             if (b == null) return;
-            var day = b.scheduleDays[((int)shift.Date.DayOfWeek + 6) % 7];
+            var day = b.scheduleDays[shift.DayOfWeekIndex];
             day.AddWorkShift(new WorkShift
             {
                 startingHour = shift.StartHour,
@@ -284,7 +284,7 @@ namespace StoreManager.Interop
         {
             var b = store.As<BuildingRegistration>();
             if (b == null) return;
-            var day = b.scheduleDays[((int)shift.Date.DayOfWeek + 6) % 7];
+            var day = b.scheduleDays[shift.DayOfWeekIndex];
             day.RemoveAllWorkShiftsThatMatchPredicate(w =>
                 w.employeeId == shift.Employee.Id && w.startingHour == shift.StartHour && w.endingHour == shift.EndHour);
         }
@@ -293,11 +293,16 @@ namespace StoreManager.Interop
         {
             var b = store.As<BuildingRegistration>();
             if (b == null) return;
-            // VERIFY: ScheduleAutoFiller ctor args (workstations, employees, partitioner) + a headless
-            // invocation that doesn't require the BizMan UI. Subscribe onCompleted, set .fast = true.
-            // var filler = new ScheduleAutoFiller(workStations, employees, partitioner);
-            // filler.onCompleted.AddListener((f, ok) => { });
-            // filler.Run();
+            // CONFIRMED: ScheduleAutoFiller(List<EmployeeInstance> employees, BuildingRegistration, ScheduleDay day = null)
+            // then new Thread(filler.FillWithEmployees).Start(); (ScheduleAutoFillerHelper does exactly this).
+            // The extension `b.AutoFillSchedule(...)` is UI-coupled (RegisterAutoFiller on the BizMan menu),
+            // so call the filler directly for a headless run.
+            var employees = EmployeeHelper.GetEmployeeInstances(new EmployeeInstancesQueryInfo { withAssignedAddress = b.Address });
+            var filler = new ScheduleAutoFiller(employees, b) { fast = true, inhibitSuccessNotification = true };
+            filler.onCompleted.AddListener((f, ok) => { /* VERIFY: post-fill cleanup — see ScheduleAutoFillerHelper.OnCompleted */ });
+            new System.Threading.Thread(filler.FillWithEmployees).Start();
+            // targetStaffingMultiplier: VERIFY where staffing target feeds in (opening hours / demand model),
+            // ScheduleAutoFiller derives need from the building's requirements, not a free multiplier.
         }
 
         // ── restock ─────────────────────────────────────────────────────────────
@@ -358,17 +363,17 @@ namespace StoreManager.Interop
             cost = (decimal)EmployeeHelper.GetTrainingCost(e, key, skillIncrease: 10);
             // VERIFY: the call that actually starts a TrainingInstance (HrManagerPlan.TrainEmployees does it
             // via an HR plan; a direct EmployeeInstance.StartTraining(key) may exist).
-            e.trainingSession = new EmployeeInstance.TrainingInstance { skill = key, startDay = CurrentDay() };
+            e.trainingSession = new EmployeeInstance.TrainingInstance { skill = key, startDay = CurrentDay };
         }
 
         // ── money ───────────────────────────────────────────────────────────────
         public bool ChangeMoney(decimal delta, string reason, bool showNotification)
         {
-            // CONFIRMED: GameManager.ChangeMoneySafe(float, TransactionInfo, int?, Address, bool force, bool showNotification)
-            // VERIFY: TransactionInfo ctor. The BackAlleyDealer example builds it from LegacyRef.Transaction.*.
-            var info = new TransactionInfo(LegacyRef.Transaction.Other,
-                new Dictionary<string, string> { { "reason", reason } }, taxDeductible: false);
-            return GameManager.ChangeMoneySafe((float)delta, info, showNotification: showNotification);
+            // CONFIRMED: TransactionInfo(string type, Dictionary<string,string> data, bool isTaxDeductible = false)
+            //            GameManager.ChangeMoneySafe(float, TransactionInfo, int? day, Address, bool force, bool showNotification)
+            var info = new TransactionInfo("storemanager:transaction_managererror",
+                new Dictionary<string, string> { { "reason", reason } });
+            return GameManager.ChangeMoneySafe((float)delta, info, null, null, false, showNotification);
         }
 
         // ── player scheduling ───────────────────────────────────────────────────
@@ -414,7 +419,5 @@ namespace StoreManager.Interop
         /// <summary>Game skills are 0–100; the mod's tuning model is 1–5. ×20 mapping.</summary>
         private static int Mathf01to5(float skill0to100) =>
             Math.Clamp((int)Math.Round(skill0to100 / 20f), ManagementSkill.Min, ManagementSkill.Max);
-
-        private int CurrentDay() => CurrentDate.DayOfYear; // VERIFY: game "day" counter (int) vs day-of-year
     }
 }
