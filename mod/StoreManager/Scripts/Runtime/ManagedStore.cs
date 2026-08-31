@@ -16,6 +16,7 @@ namespace StoreManager.Runtime
         private readonly DailyOperations _ops;
         private readonly GameRef _store;
         private readonly StoreManagerData _data;
+        private readonly Random _rng;
 
         public ManagedStore(IGameBindings game, GameRef store, StoreManagerData data)
         {
@@ -23,6 +24,8 @@ namespace StoreManager.Runtime
             _store = store;
             _data = data;
             _ops = new DailyOperations(game);
+            // One persistent stream seeded per store — advances every day, unlike a fresh-per-day Random.
+            _rng = new Random(data.MistakeSeed == 0 ? store.Id.GetHashCode() : data.MistakeSeed);
         }
 
         public StoreManagerData Data => _data;
@@ -52,8 +55,9 @@ namespace StoreManager.Runtime
             var dailyRevenue = _game.GetDailyRevenue(_store);
             _data.CurrentWeek.Revenue += dailyRevenue;
 
-            var rng = DeterministicRngForToday();
-            foreach (var mistake in mistakes.RollDay(rng, attempted, dailyRevenue))
+            // Cost model needs a positive revenue base — a loss-making store still has throughput.
+            var costBase = Math.Max(200m, Math.Abs(dailyRevenue));
+            foreach (var mistake in mistakes.RollDay(_rng, attempted, costBase))
                 ApplyMistake(mistake);
         }
 
@@ -68,7 +72,10 @@ namespace StoreManager.Runtime
         {
             // The cost lands as a money change with a reason; the attention list surfaces it in the digest.
             _game.ChangeMoney(-mistake.EstimatedCost, $"manager error: {mistake.Kind}", showNotification: false);
-            _data.CurrentWeek.AttentionItems.Add(mistake.LocaleKey);
+            _data.CurrentWeek.MistakeCount++;
+            _data.CurrentWeek.MistakeCost += mistake.EstimatedCost;
+            // distinct per (kind, cost) so the digest shows each, not one deduped line
+            _data.CurrentWeek.AttentionItems.Add($"{mistake.LocaleKey}:{mistake.EstimatedCost:0}");
         }
 
         private bool IsPresent(string? employeeId)
@@ -76,12 +83,6 @@ namespace StoreManager.Runtime
             if (employeeId == null) return false;
             var emp = _game.FindEmployee(employeeId);
             return emp.HasValue && _game.GetPresence(emp.Value) == EmployeePresence.Working;
-        }
-
-        private Random DeterministicRngForToday()
-        {
-            // Stable across a save reload: seed = store seed XOR game day.
-            return new Random(_data.MistakeSeed ^ _game.CurrentDay);
         }
     }
 }

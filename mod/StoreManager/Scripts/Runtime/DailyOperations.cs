@@ -66,8 +66,10 @@ namespace StoreManager.Runtime
 
             var tomorrowDow = (_game.CurrentDayOfWeekIndex + 1) % 7;
             var shifts = _game.GetShifts(store, tomorrowDow).ToList();
-            data.CurrentWeek.ShiftsTotal += Math.Max(shifts.Count, 1);
-            data.CurrentWeek.ShiftsCovered += shifts.Count;
+            var stationCount = Math.Max(1, _game.GetAssignableStationCount(store));
+            data.CurrentWeek.ShiftsTotal += stationCount;
+            data.CurrentWeek.ShiftsCovered += Math.Min(stationCount,
+                shifts.Count(s => !string.IsNullOrEmpty(s.Employee.Id)));
         }
 
         private void Leave(GameRef store, StoreManagerData data, ManagerRank controller, List<MistakeKind> attempted)

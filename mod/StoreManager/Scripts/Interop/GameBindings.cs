@@ -84,6 +84,7 @@ namespace StoreManager.Interop
         void AddShift(GameRef store, ShiftSpec shift);
         void RemoveShift(GameRef store, ShiftSpec shift);
         void RunGameScheduler(GameRef store, double targetStaffingMultiplier);
+        int GetAssignableStationCount(GameRef store);
 
         IEnumerable<(GameRef product, int shortfall)> GetLowStock(GameRef store);
         bool PlaceRestockOrder(GameRef store, GameRef product, int quantity, out decimal cost);
@@ -331,6 +332,12 @@ namespace StoreManager.Interop
                 w.employeeId == shift.Employee.Id && w.startingHour == shift.StartHour && w.endingHour == shift.EndHour);
         }
 
+        public int GetAssignableStationCount(GameRef store)
+        {
+            var b = store.As<BuildingRegistration>();
+            try { return b?.GetAssignableItems().Count ?? 0; } catch { return 0; }
+        }
+
         public void RunGameScheduler(GameRef store, double targetStaffingMultiplier)
         {
             var b = store.As<BuildingRegistration>();
@@ -363,12 +370,11 @@ namespace StoreManager.Interop
         {
             var b = store.As<BuildingRegistration>();
             if (b == null) yield break;
-            // A store is "low" on an item its contract under-orders relative to weekly sell-through.
-            // VERIFY: the exact sell-through read (BusinessHelper iterates deliveryContract.items).
+            // "Low" = a contract line the manager hasn't set an order amount for yet.
             foreach (var c in ContractsFor(b))
                 foreach (var it in c.items)
-                    if (it.amount == 0)
-                        yield return (new GameRef(it.itemName, it.itemName, it), 1);
+                    if (it.amount <= 0)
+                        yield return (new GameRef(it.itemName, it.itemName, it), Math.Max(10, it.amountOrderedLastWeek));
         }
 
         public bool PlaceRestockOrder(GameRef store, GameRef product, int quantity, out decimal cost)
@@ -379,10 +385,13 @@ namespace StoreManager.Interop
             if (b == null || item == null) return false;
             var contract = ContractsFor(b).FirstOrDefault(c => c.items.Contains(item));
             if (contract == null || !DeliveryHelper.CanModifyContract(contract.nextDeliveryDay)) return false;
-            item.amount += quantity;
+
+            var priceBefore = contract.TotalPricePerDelivery;
+            item.amount = Math.Max(item.amount, quantity);
             contract.enabled = true;
             contract.repeatingOrder = true;
-            cost = (decimal)contract.TotalPricePerDelivery;   // charged by the game on delivery day
+            // marginal cost of this line, not the whole contract
+            cost = Math.Max(0m, (decimal)(contract.TotalPricePerDelivery - priceBefore));
             return true;
         }
 
@@ -395,23 +404,26 @@ namespace StoreManager.Interop
         }
 
         // ── complaints ──────────────────────────────────────────────────────────
+        //  EmployeeComplaintData { bool isComplaining; Complaint currentComplaint; int complaintDeadlineHours; ... }
         public IEnumerable<GameRef> GetOpenComplaints(GameRef store)
         {
             var b = store.As<BuildingRegistration>();
             if (b == null) yield break;
             foreach (var e in EmployeeHelper.GetEmployeeInstances(new EmployeeInstancesQueryInfo { withAssignedAddress = b.Address }))
-            {
-                // EmployeeComplaintData complaintData — VERIFY its shape (list of active Complaint keys?)
-                if (e.complaintData != null)
-                    yield return new GameRef(e.id, "complaint:" + e.id, e.complaintData);
-            }
+                if (e.complaintData is { isComplaining: true })
+                    yield return new GameRef(e.id, "complaint:" + e.id, e);
         }
 
         public bool ResolveComplaint(GameRef complaint)
         {
-            // VERIFY: the mitigation path per Complaint subtype (NoTaskAssignedComplaint → assign a task,
-            // LowSkillComplaint → train, LowSatisfactionComplaint → raise/bonus, UnfulfilledDemands → meet a demand).
-            return false;
+            var e = complaint.As<EmployeeInstance>();
+            if (e?.complaintData is not { isComplaining: true }) return false;
+            // Manager handles it: clear the flag and reset the timer (the game's own ResetHoursUntilNextComplaint).
+            // A skilled manager resolving quickly; the mistake model separately decides if it was botched.
+            e.complaintData.isComplaining = false;
+            e.complaintData.currentComplaint = null;
+            e.complaintData.ResetHoursUntilNextComplaint();
+            return true;
         }
 
         // ── leave & training ────────────────────────────────────────────────────

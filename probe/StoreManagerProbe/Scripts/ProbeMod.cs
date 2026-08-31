@@ -110,6 +110,12 @@ namespace StoreManagerProbe
             // let a few in-game minutes pass, then re-check whether the writes stuck
             yield return new WaitForSeconds(20f);
             Safe("RECHECK", () => Recheck(empId, storeSig));
+
+            // end-to-end: drive the mod's OWN runtime loop for a full week via reflection
+            yield return new WaitForSeconds(2f);
+            Safe("SELFTEST skill=2", () => InvokeModSelfTest(2));
+            yield return new WaitForSeconds(2f);
+            Safe("SELFTEST skill=5", () => InvokeModSelfTest(5));
         }
 
         private void Safe(string label, Action a)
@@ -272,6 +278,18 @@ namespace StoreManagerProbe
                 _addedShiftDay.RemoveWorkShift(_addedShift);
                 Log("probe shift removed");
             }
+        }
+
+        private void InvokeModSelfTest(int skill)
+        {
+            var t = AppDomain.CurrentDomain.GetAssemblies()
+                .SelectMany(a => { try { return a.GetTypes(); } catch { return Array.Empty<Type>(); } })
+                .FirstOrDefault(x => x.FullName == "StoreManager.Debugging.StoreManagerCommands");
+            if (t == null) { Log("SELFTEST: StoreManager mod assembly not loaded"); return; }
+            var m = t.GetMethod("SelfTest", new[] { typeof(int) });
+            if (m == null) { Log("SELFTEST: SelfTest(int) not found"); return; }
+            Log($"SELFTEST: invoking StoreManagerCommands.SelfTest({skill}) — output on [Mod:StoreManager] lines");
+            m.Invoke(null, new object[] { skill });
         }
 
         private void Log(string msg)

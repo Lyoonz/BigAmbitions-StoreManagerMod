@@ -22,6 +22,8 @@ namespace StoreManager.Runtime
             public int ShiftsTotal;
             public int ComplaintsResolved;
             public int ComplaintsTotal;
+            public int MistakeCount;
+            public decimal MistakeCost;
             public List<string> AttentionItems = new();
 
             public bool NeedsAttention => AttentionItems.Count > 0;
@@ -40,6 +42,8 @@ namespace StoreManager.Runtime
                 ShiftsTotal = w.ShiftsTotal,
                 ComplaintsResolved = w.ComplaintsResolved,
                 ComplaintsTotal = w.ComplaintsTotal,
+                MistakeCount = w.MistakeCount,
+                MistakeCost = w.MistakeCost,
                 AttentionItems = w.AttentionItems.Distinct().ToList(),
             };
         }

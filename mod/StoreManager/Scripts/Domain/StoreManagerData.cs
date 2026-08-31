@@ -52,6 +52,8 @@ namespace StoreManager.Domain
         public int ShiftsTotal;
         public int ComplaintsResolved;
         public int ComplaintsTotal;
+        public int MistakeCount;
+        public decimal MistakeCost;
         public List<string> AttentionItems = new();
 
         public void Reset()
@@ -63,6 +65,8 @@ namespace StoreManager.Domain
             ShiftsTotal = 0;
             ComplaintsResolved = 0;
             ComplaintsTotal = 0;
+            MistakeCount = 0;
+            MistakeCost = 0m;
             AttentionItems.Clear();
         }
     }
