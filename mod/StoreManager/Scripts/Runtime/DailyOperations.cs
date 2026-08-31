@@ -113,7 +113,8 @@ namespace StoreManager.Runtime
 
             if (weakest.emp.Raw == null) return;
             _game.StartTraining(weakest.emp, TrainableSkill.CustomerService, out var cost);
-            if (cost > 0) data.CurrentWeek.AttentionItems.RemoveAll(_ => false); // no-op; cost tracked by game
+            if (cost > data.Policy.WeeklyTrainingBudget)
+                data.CurrentWeek.AttentionItems.Add($"training at {store.DisplayName} exceeded budget");
         }
     }
 }
