@@ -65,7 +65,10 @@ namespace StoreManager.Core
             _game.DayElapsed += OnDay;
             _game.WeekElapsed += OnWeek;
 
-            context.Logger.Info($"Store Manager active — {_directory.Stores.Count} managed store(s).");
+            StoreManager.Debugging.StoreManagerCommands.Register(_directory, _game);
+
+            context.Logger.Info($"Store Manager active — {_directory.Stores.Count} managed store(s). " +
+                                "Debug console: StoreManager.Hire / .Status / .RunDay / .RunWeek");
             return Task.CompletedTask;
         }
 
@@ -76,6 +79,7 @@ namespace StoreManager.Core
                 _game.DayElapsed -= OnDay;
                 _game.WeekElapsed -= OnWeek;
             }
+            StoreManager.Debugging.StoreManagerCommands.Unregister();
             _directory?.Detach();
             _directory = null;
             _handoff = null;

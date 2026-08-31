@@ -18,8 +18,14 @@ Full design: see the design brief and the Phase 0 runbook (links in `DECISIONS.m
 | **Phase 0** | ✅ **done** — decompiled the game, mapped every type, mod compiles + **runs in the real game** (Build 3670), all SDK hooks fire, all read bindings verified live (`REPORT.md`). Verdict: **GO** |
 | Game bindings (`Interop/GameBindings.cs`) | ✅ real implementations; ~10 `// VERIFY` notes (field names / wholesale path / one behavioural check) |
 | Build & deploy | ✅ `dotnet` (net472) → `build/deploy-local.sh`. **No Unity needed** — local mods just need one DLL in `ModsLocal/<name>/` |
-| Write-path check (task/shift honoured by sim) | ⏳ needs a save with hired employees (test save had none) |
-| Phase 1: hiring UI, playtest, balance | ⛔ next |
+| Restock write-path (`DeliveryContract`) | ✅ verified in-game — item-amount write recomputes cost |
+| **Phase 1 hiring entry point** | ✅ debug-console commands (`StoreManager.Hire/.Status/.RunDay/.RunWeek`) — register in the real game with no error. Real UI is later polish. |
+| Task/shift write-path check | ⏳ needs a save with hired employees (test save had 0 staff anywhere) |
+| Phase 1: playtest & balance the numbers | ⛔ needs human gameplay on a staffed save |
+
+**Try it:** `bash build/deploy-local.sh` → load a save where you've hired a shop employee →
+open the debug console → `StoreManager.Hire manager 4` while standing in the shop →
+`StoreManager.RunDay` / `StoreManager.Status`.
 
 ## Layout
 

@@ -49,13 +49,15 @@ path and a few `// VERIFY` field names. Everything else is proven.
   shows in the BizMan schedule, employee turns up). The test save had 0 staff anywhere.
 - Then clear the last few `// VERIFY` field-name notes off the probe dump.
 
-### 3. Phase 1 — core, one store  *(build against the now-real GameBindings)*
-- Wire a minimal hiring entry point (extend `ManagerDirectory.AssignManager`) — a debug
-  command is fine for the first playtest; a proper UI (a store-panel button, or a
-  `RadzenButton`-equivalent native window) comes after it works.
-- Playtest the daily loop + weekly digest against a real store. Tune the numbers in
-  `ManagementSkill` / `MistakeModel` / `DifficultyProfile` (all placeholders today).
-- Confirm save round-trip: assign a manager, save, reload, uninstall the mod, reload.
+### 3. Phase 1 — core, one store
+- **Hiring entry point — done:** debug-console commands `StoreManager.Hire manager|assistant <1-5>`,
+  `.Status`, `.RunDay`, `.RunWeek` (`Scripts/Debug/StoreManagerCommands.cs`), verified registering
+  in the real game. First playtest uses these; a proper UI is later polish.
+- **Left:** on a save with a hired shop employee, run `StoreManager.Hire manager 4` + `.RunDay`
+  and watch the daily loop. Tune `ManagementSkill` / `MistakeModel` / `DifficultyProfile`
+  numbers (all placeholders) against how it feels. Confirm save round-trip with a manager assigned.
+- This is the part that needs a human playing — the "great vs poor manager" feel is a balance
+  judgement, not something to derive.
 
 ### 4. Phase 2 — player scheduling + register handoff
 - Add the player to the schedule UI as a schedulable entity (`PlayerScheduleBook`).
