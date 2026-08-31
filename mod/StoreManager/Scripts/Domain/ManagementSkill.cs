@@ -17,7 +17,7 @@ namespace StoreManager.Domain
 
         public ManagementSkill(int value)
         {
-            Value = Math.Clamp(value, Min, Max);
+            Value = Num.Clamp(value, Min, Max);
         }
 
         /// <summary>

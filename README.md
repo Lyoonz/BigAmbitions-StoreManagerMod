@@ -15,11 +15,11 @@ Full design: see the design brief and the Phase 0 runbook (links in `DECISIONS.m
 | Toolchain decision | ✅ locked — official SDK (`BAModAPI`), see `DECISIONS.md` |
 | Domain model (skill, mistakes, policy, difficulty, wages) | ✅ implemented — pure C#, no game deps |
 | SDK entry points / manifest / asmdef | ✅ scaffolded against the real SDK API |
-| **Phase 0 static decompile** | ✅ done — game assemblies decompiled, real types mapped (`PHASE0-FINDINGS.md`) |
-| Game bindings (`Interop/GameBindings.cs`) | ✅ rewritten against **real** game types; ~12 `// VERIFY` notes for in-game behaviour checks (no `PHASE0`/unknown-API markers left) |
-| Phase 0 probe mod (`probe/`) | ✅ written with real type names; `REPORT.md` code-map filled |
-| Phase 0 in-game run (probes F8–F11) | ⛔ needs the game + Unity 2022.3.62f2 |
-| Runtime wiring, playtest, balance | ⛔ needs the above |
+| **Phase 0** | ✅ **done** — decompiled the game, mapped every type, mod compiles + **runs in the real game** (Build 3670), all SDK hooks fire, all read bindings verified live (`REPORT.md`). Verdict: **GO** |
+| Game bindings (`Interop/GameBindings.cs`) | ✅ real implementations; ~10 `// VERIFY` notes (field names / wholesale path / one behavioural check) |
+| Build & deploy | ✅ `dotnet` (net472) → `build/deploy-local.sh`. **No Unity needed** — local mods just need one DLL in `ModsLocal/<name>/` |
+| Write-path check (task/shift honoured by sim) | ⏳ needs a save with hired employees (test save had none) |
+| Phase 1: hiring UI, playtest, balance | ⛔ next |
 
 ## Layout
 

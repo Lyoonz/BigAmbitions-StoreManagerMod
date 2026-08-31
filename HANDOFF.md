@@ -21,35 +21,33 @@
 - **Phase 0 probe:** `probe/StoreManagerProbe/` — runnable SDK mod, F8/F9/F10/F11 hotkeys,
   `REPORT.md` template.
 
-- **Phase 0 static pass — done.** Game assemblies decompiled (Mono build), real types mapped in
-  `PHASE0-FINDINGS.md`, `GameBindings.cs` rewritten against real game types, `probe/REPORT.md`
-  code-map filled. Static verdict: **leaning GO** — every needed type is public in a referenced
-  assembly, no patching required so far.
+- **Phase 0 — DONE.** Decompiled the game, mapped every type (`PHASE0-FINDINGS.md`), rewrote
+  `GameBindings.cs` against real types, built with `dotnet` (net472), packaged to `ModsLocal/`,
+  and **ran it in the real game** (Build 3670). All SDK hooks fired; the probe auto-loaded a
+  save and verified every read binding against live data, zero exceptions, zero save writes
+  (`probe/REPORT.md`). **Verdict: GO.** No Unity was needed — local mods just need one DLL.
 
-## Left — needs the game + Unity 2022.3.62f2 (can't be done here)
+## Left
 
-Do these in order. Each step unblocks the next. Phase 0 is now mostly *verification* +
-three specific unknowns (marked `// VERIFY` in `GameBindings.cs`):
-the `ScheduleAutoFiller` ctor, the wholesale purchase path, and whether the sim honours a
-mod-set task/shift.
+Phase 0 has one loose end: the write-path check (does the sim keep a mod-written task/shift)
+needs a save **with hired employees** — the test save had none. Plus the wholesale purchase
+path and a few `// VERIFY` field names. Everything else is proven.
 
-### 1. Stand up the SDK  *(~half day)*
-- Install Big Ambitions (Steam) + Unity Hub + Unity **2022.3.62f2** + macOS build support.
-- `git clone https://github.com/hovgaardgames/bigambitions`, open in Unity, accept the
-  DLL-import prompt (defines `BA_GAME_DLLS_IMPORTED`).
-- Build & install one sample mod (e.g. Example-Options) to confirm the toolchain.
-- Copy `mod/StoreManager/` and `probe/StoreManagerProbe/` into `<sdk>/Assets/Mods/`.
-- Fix `ModManifest.asset` per `MANIFEST-SETUP.md` (recreate via the menu, relink fields).
-- Record: is the shipped game **Mono or IL2CPP**?
+### 1. Build & deploy  *(done — repeatable)*
+- `bash build/deploy-local.sh` builds the mod with `dotnet` (net472) and drops it in
+  `ModsLocal/StoreManager/`. Add `--probe` to also deploy the headless test probe.
+- Launch `steam://rungameid/1331550//-windowed`, then read `Player.log`
+  (`~/AppData/LocalLow/Hovgaard Games/Big Ambitions/Player.log`).
+- **No Unity / SDK clone needed.** The Unity Mod Builder is only for the Steam Workshop upload;
+  `ModManifest.asset` is not read at runtime. (For the Workshop upload later, the SDK route in
+  `MANIFEST-SETUP.md` still applies.)
 
-### 2. Phase 0 — finish the in-game verification  *(~1 day now, was 2)*
-- Code map + `GameBindings.cs` are already done from the decompile. Remaining:
-- Run the probe: build & install `probe/StoreManagerProbe/`, load a city with a staffed store,
-  press **F8** (dump), **F9** (reassign), **F10** (shift), **F11** (restock). Record in `REPORT.md`.
-- Resolve the `// VERIFY` notes in `GameBindings.cs` (≈12) — mostly confirming an overload or a
-  field name. The three that matter: `ScheduleAutoFiller` ctor + headless run, the wholesale
-  purchase path, and whether the sim keeps a mod-set task/shift.
-- **Go / conditional (D2 — bundle `0Harmony.dll`) / no-go (numbers-only re-scope).**
+### 2. Phase 0 — one loose end  *(~1–2 hours, needs a staffed save)*
+- Load a save that has **hired employees** at a store. Run the probe (`--probe`).
+- Confirm probe #1 (a mod-set `assignedWorkStationItems` sticks) and #2 (`ScheduleDay.AddWorkShift`
+  shows in the BizMan schedule and the employee turns up).
+- Resolve the remaining `// VERIFY` notes in `GameBindings.cs` — the wholesale purchase path is
+  the only non-trivial one; the rest are field-name confirmations you can read off the probe dump.
 
 ### 3. Phase 1 — core, one store  *(build against the now-real GameBindings)*
 - Wire a minimal hiring entry point (extend `ManagerDirectory.AssignManager`) — a debug

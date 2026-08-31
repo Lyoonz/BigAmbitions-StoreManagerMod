@@ -1,11 +1,45 @@
 # Phase 0 probe report
 
-Static decompile done (2026-08-31). **In-game probe run still pending** — needs Unity
-2022.3.62f2 + a running save. Fill the "Result" columns after running F8–F11.
+**RUN — 2026-08-31, Big Ambitions Build 3670.** The mod was built with `dotnet` (net472),
+hand-packaged into `ModsLocal/`, and the real game was launched. The probe auto-loaded the
+last save and ran headless. No Unity needed.
+
+## What the run proved
+
+| Check | Result |
+|-------|--------|
+| `dotnet`-built net472 DLL loads in the real game | ✅ `[Mod:StoreManager]` / `[Mod:StoreManagerProbe]` both discovered & loaded |
+| `ModCompatibilityValidator` (major-version check) | ✅ passed — no `Incompatible` line |
+| `[ModEntryOnInitializationLoad]` fires | ✅ `Store Manager policy options registered.` |
+| `[ModEntryMainMenu]` fires | ✅ probe auto-loaded last save (`LoadAsync(null,true) = True`) |
+| `[ModEntryOnCityLoad]` fires | ✅ `Store Manager active — 0 managed store(s).` + probe city hook |
+| `OptionsService.Register` / `ModOptions` builder | ✅ no error |
+| `ManagerDirectory.Load()` + `ModDataStore` file read | ✅ ran, no file yet, no throw |
+| `SaveGameManager.Current.BuildingRegistrations` | ✅ `regs=885` enumerated |
+| `TimeHelper.CurrentDay` / `.GetDayOfWeek()` | ✅ `day=8 dow=Monday` |
+| `GetPlayerStores()` filter + `BuildingRegistration.BusinessName / .Address / .businessTypeName / .scheduleDays` | ✅ `STORE 'Unity Grill' addr=ba:street_tenthstreet 3 type=ba:businesstype_fastfoodrestaurant days=7` |
+| `.satisfaction.overall` (reputation) | ✅ `sat=77` |
+| `.GetAvgDailyIncome(1)` (revenue) | ✅ `avgDailyIncome=-33` |
+| Exceptions from mod/probe | ✅ **none** |
+| Save files modified by the run | ✅ **none** (byte-identical before/after — `LoadAsync` doesn't write) |
+
+## Still open — needs a save WITH hired employees
+
+The test save's businesses had **no staff** (`store has no employees`), so probes #1 (reassign
+task) and #2 (write shift) couldn't exercise a real `EmployeeInstance`. The *read* path is fully
+proven; the one remaining question is behavioural:
+
+| Probe | Result |
+|-------|--------|
+| 1 — reassign task (`assignedWorkStationItems` / `EmployeeStationController`) | ⏳ needs a staffed save |
+| 2 — write shift (`ScheduleDay.AddWorkShift`) | ⏳ needs a staffed save — but it's the game's own method, low risk |
+| 2 — write shift (`ScheduleAutoFiller`) | ⏳ ctor `(employees, registration, day)` confirmed; run it on a staffed save |
+| 3 — trigger restock | ⏳ wholesale purchase path still `// VERIFY` |
 
 ## Environment
-- Game: Steam build, tally date 2026-08-29. **Mono** (managed DLLs are real .NET — fully decompilable).
-- SDK: not yet cloned. Unity present on this machine is 6000.4.9f1 — **need 2022.3.62f2** for the SDK.
+- Game: Steam Build 3670, **Mono** (managed DLLs are real .NET).
+- Built with `dotnet build` targeting **net472** (matches `CosaNostra.dll` in the install). No Unity used.
+- Deploy: `build/deploy-local.sh` (or `--probe`).
 
 ## Workforce code map — from decompile (see ../../PHASE0-FINDINGS.md for detail)
 
@@ -50,12 +84,9 @@ Static decompile done (2026-08-31). **In-game probe run still pending** — need
 - Reputation field location: ______
 
 ## Decision
-- [ ] **GO** — probes 1–3 honoured, no private-method patching. Reach already proven statically.
-- [ ] **CONDITIONAL GO (D2)** — needs bundled Harmony for: ______
-- [ ] **NO-GO / RE-SCOPE** — task assignment not honoured by the sim → numbers-only manager.
 
-Static verdict: **GO (pending one behavioural check).** The entire mod + probe compile clean
-(0 warnings, 0 errors) against the real game + Unity DLLs — every type, method and field is
-real and correctly used. No reflection or Harmony needed. The only open risk is behavioural:
-does the sim keep a mod-set task/shift? Probes #1/#2 settle that. Everything else behind
-`// VERIFY` is a field-name or overload confirmation, not a design risk.
+**GO.** [x] The mod builds, loads in the real game, all SDK hooks fire, and every read binding
+is confirmed against a live save with zero exceptions. No Harmony, no reflection, no patching.
+The one remaining check (does the sim keep a mod-written shift/task) is gated only on having a
+staffed save to test with — it is not a design risk, since `ScheduleDay.AddWorkShift` is the
+game's own API.

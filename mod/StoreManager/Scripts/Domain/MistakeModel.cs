@@ -46,7 +46,7 @@ namespace StoreManager.Domain
         }
 
         public float EffectiveMistakeChance =>
-            Math.Clamp(_skill.BaseMistakeChance * _difficulty.MistakeFrequencyMultiplier, 0f, 0.95f);
+            Num.Clamp(_skill.BaseMistakeChance * _difficulty.MistakeFrequencyMultiplier, 0f, 0.95f);
 
         public float EffectiveSeverity =>
             _skill.MistakeSeverity * _difficulty.MistakeSeverityMultiplier;

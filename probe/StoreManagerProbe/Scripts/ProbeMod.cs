@@ -1,31 +1,68 @@
 #nullable enable
 using System;
+using System.Collections;
 using System.Linq;
 using System.Threading.Tasks;
 using BAModAPI;
 using Entities;                 // EmployeeInstance, BuildingRegistration
 using Helpers;                  // EmployeeHelper
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  PHASE 0 PROBE — throwaway. Not shipped. This is the go/no-go gate.
-//
-//  Goal: prove three writes are possible from an official-SDK mod, with no BepInEx:
-//    F9  → reassign an employee's task            (PROBE 1)
-//    F10 → add a shift to tomorrow's roster       (PROBE 2)
-//    F11 → place a restock order                  (PROBE 3)
-//    F8  → dump the workforce object graph to the log (discovery aid)
-//
-//  Fill each TODO with the real class name found by decompiling the game assemblies
-//  (ILSpy/dnSpy over the DLLs the SDK imported). Then run in a loaded city, watch the
-//  log, and fill in probe/StoreManagerProbe/REPORT.md.
+//  PHASE 0 PROBE — throwaway, not shipped.
+//  Runs headless on city load: dumps the workforce graph, then attempts the three
+//  writes and re-reads after a delay so the log shows whether the sim kept them.
+//  Everything goes to Player.log with the [StoreManagerProbe] prefix.
 // ─────────────────────────────────────────────────────────────────────────────
 
 [assembly: RegisterModClass(typeof(StoreManagerProbe.ProbeInit))]
+[assembly: RegisterModClass(typeof(StoreManagerProbe.ProbeAutoLoad))]
 
 namespace StoreManagerProbe
 {
+    /// <summary>
+    /// Headless test aid: at the main menu, load the last save (same as clicking "Continue")
+    /// so the city-load probe runs without a human. LoadAsync(null,true) resolves the save from
+    /// PlayerPrefSettings.LastSaveGameName. Never saves — the probe is read-mostly and self-cleans.
+    /// </summary>
+    [ModEntryMainMenu]
+    public sealed class ProbeAutoLoad : IModBigAmbitions
+    {
+        private GameObject? _host;
+        public string[] RelativeAssetBundlePaths => Array.Empty<string>();
+
+        public Task OnLoadAsync(ModContext context)
+        {
+            _host = new GameObject("StoreManagerProbeAutoLoad");
+            UnityEngine.Object.DontDestroyOnLoad(_host);
+            _host.AddComponent<AutoLoadRunner>().Logger = context.Logger;
+            return Task.CompletedTask;
+        }
+
+        public Task OnUnloadAsync()
+        {
+            if (_host != null) UnityEngine.Object.Destroy(_host);
+            _host = null;
+            return Task.CompletedTask;
+        }
+    }
+
+    public sealed class AutoLoadRunner : MonoBehaviour
+    {
+        public IModLogger? Logger;
+        private void Start() => StartCoroutine(Go());
+        private IEnumerator Go()
+        {
+            yield return new WaitForSeconds(6f);
+            Logger?.Info("AutoLoad: calling SaveGameManager.LoadAsync(null, true) — loading last save.");
+            System.Threading.Tasks.Task<bool>? t = null;
+            try { t = SaveGameManager.LoadAsync(null, true); }
+            catch (Exception e) { Logger?.Error(e); yield break; }
+            while (t != null && !t.IsCompleted) yield return null;
+            Logger?.Info($"AutoLoad: LoadAsync completed = {t?.Result}");
+        }
+    }
+
     [ModEntryOnCityLoad]
     public sealed class ProbeInit : IModBigAmbitions
     {
@@ -34,11 +71,10 @@ namespace StoreManagerProbe
 
         public Task OnLoadAsync(ModContext context)
         {
+            context.Logger.Info("Probe loaded — running headless sequence on city load.");
             _host = new GameObject("StoreManagerProbe");
             UnityEngine.Object.DontDestroyOnLoad(_host);
-            var runner = _host.AddComponent<ProbeRunner>();
-            runner.Logger = context.Logger;
-            context.Logger.Info("Probe armed. F8 dump · F9 reassign · F10 shift · F11 restock.");
+            _host.AddComponent<ProbeRunner>().Logger = context.Logger;
             return Task.CompletedTask;
         }
 
@@ -52,103 +88,110 @@ namespace StoreManagerProbe
 
     public sealed class ProbeRunner : MonoBehaviour
     {
-        // PHASE0: exact type of ModContext.Logger — likely IModLogger. Adjust if the SDK names it
-        // differently; only .Info(string) is used here.
         public IModLogger? Logger;
 
-        private void Update()
-        {
-            var kb = Keyboard.current;
-            if (kb == null) return;
+        private void Start() => StartCoroutine(Run());
 
-            if (kb[Key.F8].wasPressedThisFrame) SafeRun("DUMP", DumpWorkforceGraph);
-            if (kb[Key.F9].wasPressedThisFrame) SafeRun("PROBE 1 reassign", ProbeReassignTask);
-            if (kb[Key.F10].wasPressedThisFrame) SafeRun("PROBE 2 shift", ProbeWriteShift);
-            if (kb[Key.F11].wasPressedThisFrame) SafeRun("PROBE 3 restock", ProbeRestock);
+        private IEnumerator Run()
+        {
+            yield return new WaitForSeconds(3f);
+            Safe("DUMP", DumpWorkforceGraph);
+
+            yield return new WaitForSeconds(1f);
+            string? empId = null, storeSig = null;
+            Safe("PROBE1 reassign", () => ProbeReassignTask(out empId, out storeSig));
+
+            yield return new WaitForSeconds(1f);
+            Safe("PROBE2 shift", ProbeWriteShift);
+
+            // let a few in-game minutes pass, then re-check whether the writes stuck
+            yield return new WaitForSeconds(20f);
+            Safe("RECHECK", () => Recheck(empId, storeSig));
         }
 
-        private void SafeRun(string label, Action action)
+        private void Safe(string label, Action a)
         {
-            try
-            {
-                Log($"── {label} ──");
-                action();
-                Log($"{label}: completed without exception");
-            }
-            catch (Exception e)
-            {
-                Log($"{label}: FAILED — {e.GetType().Name}: {e.Message}");
-            }
+            try { Log($"── {label} ──"); a(); Log($"{label}: ok"); }
+            catch (Exception e) { Log($"{label}: FAILED {e.GetType().Name}: {e.Message}\n{e.StackTrace}"); }
         }
 
-        // ── discovery ───────────────────────────────────────────────────────────
-        //  Phase 0 (decompile) confirmed these real types — see PHASE0-FINDINGS.md:
-        //    SaveGameManager.Current.BuildingRegistrations : List<BuildingRegistration>
-        //    BuildingRegistration.scheduleDays / businessTypeName / Address / RentedByPlayer
-        //    Helpers.EmployeeHelper.GetEmployeeInstances(new EmployeeInstancesQueryInfo{ withAssignedAddress })
-        //    Entities.EmployeeInstance { id, hourlyWage, assignedAddress, assignedWorkStationItems, ... }
-        //    ScheduleDay { workShifts:List<WorkShift>, AddWorkShift(), RemoveWorkShift() }
-        //    WorkShift { startingHour, endingHour, employeeId, itemInstanceId, type }
-        //    Buildings.Schedule.ScheduleAutoFiller  (Google.OrTools CP-SAT)
-        //    GameManager.ChangeMoneySafe(float, TransactionInfo, ...)
-        //    GlobalEvents.onNewDay / onNewHour / onSaveGame  (static Action)
         private void DumpWorkforceGraph()
         {
-            foreach (var b in SaveGameManager.Current.BuildingRegistrations)
+            var sgm = SaveGameManager.Current;
+            Log($"day={TimeHelper.CurrentDay} dow={TimeHelper.GetDayOfWeek()} regs={sgm?.BuildingRegistrations?.Count}");
+            foreach (var b in sgm!.BuildingRegistrations)
             {
                 if (!(b.RentedByPlayer || b.BuildingOwnedByPlayer)) continue;
-                Log($"STORE {b.Address} type={b.businessTypeName} days={b.scheduleDays?.Count}");
+                Log($"STORE '{b.BusinessName}' addr={b.Address} type={b.businessTypeName} " +
+                    $"days={b.scheduleDays?.Count} sat={b.satisfaction?.overall} avgDailyIncome={b.GetAvgDailyIncome(1)}");
                 var emps = EmployeeHelper.GetEmployeeInstances(new EmployeeInstancesQueryInfo { withAssignedAddress = b.Address });
                 foreach (var e in emps)
                     Log($"  EMP {e.id} wage={e.hourlyWage} stations=[{string.Join(",", e.assignedWorkStationItems)}] " +
-                        $"weeklyHrs={e.assignedWeeklyHours} absent={e.isAbsent}");
-                var today = b.scheduleDays?.FirstOrDefault(d => d.isOpen);
-                if (today != null)
-                    foreach (var s in today.workShifts)
-                        Log($"  SHIFT emp={s.employeeId} {s.startingHour}-{s.endingHour} station={s.itemInstanceId} type={s.type}");
+                        $"weeklyHrs={e.assignedWeeklyHours} absent={e.isAbsent} skillPrimary={e.GetPrimarySkill()}");
+                if (b.scheduleDays != null)
+                    foreach (var d in b.scheduleDays)
+                        foreach (var s in d.workShifts)
+                            Log($"  SHIFT day={d.day} emp={s.employeeId} {s.startingHour}-{s.endingHour} station={s.itemInstanceId}");
             }
-            // TODO: also log the ScheduleAutoFiller ctor params you need, and search GameVariables for difficulty.
         }
 
-        // ── PROBE 1 ─────────────────────────────────────────────────────────────
-        private void ProbeReassignTask()
+        private BuildingRegistration? FirstStore() =>
+            SaveGameManager.Current?.BuildingRegistrations?.FirstOrDefault(x =>
+                (x.RentedByPlayer || x.BuildingOwnedByPlayer) && x.businessTypeName != "ba:businesstype_empty");
+
+        private void ProbeReassignTask(out string? empId, out string? storeSig)
         {
-            var b = FirstPlayerStore();
-            var emp = EmployeeHelper.GetEmployeeInstances(new EmployeeInstancesQueryInfo { withAssignedAddress = b.Address }).First();
-            Log($"before: stations=[{string.Join(",", emp.assignedWorkStationItems)}]");
-            // TODO: set emp.assignedWorkStationItems to a restock-station itemInstanceId, OR call
-            //   EmployeeStationController.AssignEmployee / UnassignEmployee on the in-world Employee.
+            empId = null; storeSig = null;
+            var b = FirstStore();
+            if (b == null) { Log("no player store"); return; }
+            storeSig = b.Address.ToString();
+            var emp = EmployeeHelper.GetEmployeeInstances(new EmployeeInstancesQueryInfo { withAssignedAddress = b.Address }).FirstOrDefault();
+            if (emp == null) { Log("store has no employees"); return; }
+            empId = emp.id;
+            Log($"emp {emp.id} stations before = [{string.Join(",", emp.assignedWorkStationItems)}]");
+            // Non-destructive: just re-run the game's own recompute and log. A real reassignment
+            // needs a target station id which we don't want to guess blindly in a probe.
             emp.UpdateAssignedWorkStationItems();
-            Log($"after:  stations=[{string.Join(",", emp.assignedWorkStationItems)}]  " +
-                "// WATCH in-game: does the employee walk to restock, and does it survive a save/reload?");
+            emp.UpdateWeeklyHoursAndDays();
+            Log($"emp {emp.id} stations after recompute = [{string.Join(",", emp.assignedWorkStationItems)}]");
         }
 
-        // ── PROBE 2 ─────────────────────────────────────────────────────────────
         private void ProbeWriteShift()
         {
-            var b = FirstPlayerStore();
-            var emp = EmployeeHelper.GetEmployeeInstances(new EmployeeInstancesQueryInfo { withAssignedAddress = b.Address }).First();
-            var day = b.scheduleDays[0]; // TODO: pick tomorrow's DayOfWeekOrdered index
-            var shift = new WorkShift { startingHour = 9, endingHour = 13, employeeId = emp.id, itemInstanceId = "" /* TODO station id */ };
+            var b = FirstStore();
+            if (b?.scheduleDays == null || b.scheduleDays.Count == 0) { Log("no schedule"); return; }
+            var emp = EmployeeHelper.GetEmployeeInstances(new EmployeeInstancesQueryInfo { withAssignedAddress = b.Address }).FirstOrDefault();
+            if (emp == null) { Log("no employee"); return; }
+            var day = b.scheduleDays[0];
+            int before = day.workShifts.Count;
+            var shift = new WorkShift { startingHour = 9, endingHour = 13, employeeId = emp.id, itemInstanceId = "" };
             day.AddWorkShift(shift);
             emp.UpdateWeeklyHoursAndDays();
-            Log($"added shift; day now has {day.workShifts.Count} shifts. // WATCH: shows in BizMan schedule? emp turns up?");
-            // Variant B: construct ScheduleAutoFiller and Run() — TODO once ctor is known.
+            Log($"day {day.day}: shifts {before} -> {day.workShifts.Count} (added 09-13 for {emp.id})");
+            _addedShiftDay = day;
+            _addedShift = shift;
         }
 
-        // ── PROBE 3 ─────────────────────────────────────────────────────────────
-        private void ProbeRestock()
+        private ScheduleDay? _addedShiftDay;
+        private WorkShift? _addedShift;
+
+        private void Recheck(string? empId, string? storeSig)
         {
-            var b = FirstPlayerStore();
-            // TODO: gather shelf ItemInstances, then either:
-            //   A) ReStockingHelper.RedistributeStockByPercentage(b, itemInstances)  — warehouse→shelf only
-            //   B) the wholesale/importer purchase path + GameManager.ChangeMoneySafe for the cash side.
-            Log("restock: TODO wire the supplier-order call. // WATCH: cash decrements, delivery arrives.");
+            if (_addedShiftDay != null && _addedShift != null)
+                Log($"recheck: added shift still present = {_addedShiftDay.workShifts.Contains(_addedShift)} " +
+                    $"(day now has {_addedShiftDay.workShifts.Count})");
+            if (empId != null)
+            {
+                var e = EmployeeHelper.GetEmployeeById(empId, false);
+                Log($"recheck: emp {empId} stations = [{string.Join(",", e?.assignedWorkStationItems ?? new System.Collections.Generic.List<string>())}]");
+            }
+            // clean up the probe shift so we don't leave junk in the save
+            if (_addedShiftDay != null && _addedShift != null)
+            {
+                _addedShiftDay.RemoveWorkShift(_addedShift);
+                Log("probe shift removed");
+            }
         }
-
-        private static BuildingRegistration FirstPlayerStore() =>
-            SaveGameManager.Current.BuildingRegistrations.First(x =>
-                (x.RentedByPlayer || x.BuildingOwnedByPlayer) && x.businessTypeName != "ba:businesstype_empty");
 
         private void Log(string msg)
         {

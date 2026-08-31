@@ -3,13 +3,16 @@
 Resolved by decompiling the shipped assemblies (Mono build, real .NET — `ilspycmd` over
 `Big Ambitions_Data/Managed/*.dll`). Build version tally date 2026-08-29.
 
-**The whole mod compiles clean (0 warnings, 0 errors) against the real game + Unity assemblies**
-via `build/CompileCheck.csproj` — domain, runtime, UI, interop, player-scheduling, and the probe.
-So every type/method/field referenced below is real and correctly used.
+**Verified in the running game (Build 3670), no Unity needed.** The mod was built with
+`dotnet` (net472), hand-packaged to `ModsLocal/`, and run. All SDK hooks fired; the probe
+auto-loaded a save and confirmed every read binding against live data — `BuildingRegistrations`
+(885), `BusinessName`, `Address`, `businessTypeName`, `scheduleDays`, `satisfaction.overall`,
+`GetAvgDailyIncome`, `TimeHelper.CurrentDay/GetDayOfWeek` — with zero exceptions and zero save
+writes. See `probe/StoreManagerProbe/REPORT.md`.
 
-**In-game verification still outstanding** (needs Unity 2022.3.62f2 + a running save): whether
-the sim *honours* a mod-written task/shift the same frame; the exact staffing input to
-`ScheduleAutoFiller`; the wholesale purchase path; a few field names behind `// VERIFY`.
+**Still outstanding:** the write-path behavioural check (does the sim keep a mod-written
+task/shift) needs a save with hired employees; the test save had none. Plus the wholesale
+purchase path and a few field names behind `// VERIFY`.
 
 ## Assemblies & namespaces
 

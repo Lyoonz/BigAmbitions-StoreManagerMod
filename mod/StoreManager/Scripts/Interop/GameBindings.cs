@@ -418,6 +418,6 @@ namespace StoreManager.Interop
 
         /// <summary>Game skills are 0–100; the mod's tuning model is 1–5. ×20 mapping.</summary>
         private static int Mathf01to5(float skill0to100) =>
-            Math.Clamp((int)Math.Round(skill0to100 / 20f), ManagementSkill.Min, ManagementSkill.Max);
+            Num.Clamp((int)Math.Round(skill0to100 / 20f), ManagementSkill.Min, ManagementSkill.Max);
     }
 }
