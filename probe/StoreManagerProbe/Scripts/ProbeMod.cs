@@ -104,6 +104,9 @@ namespace StoreManagerProbe
             yield return new WaitForSeconds(1f);
             Safe("PROBE2 shift", ProbeWriteShift);
 
+            yield return new WaitForSeconds(1f);
+            Safe("PROBE3 delivery", ProbeDeliveryContract);
+
             // let a few in-game minutes pass, then re-check whether the writes stuck
             yield return new WaitForSeconds(20f);
             Safe("RECHECK", () => Recheck(empId, storeSig));
@@ -118,7 +121,10 @@ namespace StoreManagerProbe
         private void DumpWorkforceGraph()
         {
             var sgm = SaveGameManager.Current;
-            Log($"day={TimeHelper.CurrentDay} dow={TimeHelper.GetDayOfWeek()} regs={sgm?.BuildingRegistrations?.Count}");
+            int staffed = sgm!.BuildingRegistrations.Count(r => r.scheduleDays != null && r.scheduleDays.Count > 0 &&
+                EmployeeHelper.GetEmployeeInstances(new EmployeeInstancesQueryInfo { withAssignedAddress = r.Address }).Count > 0);
+            Log($"day={TimeHelper.CurrentDay} dow={TimeHelper.GetDayOfWeek()} regs={sgm.BuildingRegistrations.Count} " +
+                $"staffedBusinesses={staffed} deliveryContracts={sgm.DeliveryContracts?.Count}");
             foreach (var b in sgm!.BuildingRegistrations)
             {
                 if (!(b.RentedByPlayer || b.BuildingOwnedByPlayer)) continue;
@@ -135,22 +141,34 @@ namespace StoreManagerProbe
             }
         }
 
-        private BuildingRegistration? FirstStore() =>
-            SaveGameManager.Current?.BuildingRegistrations?.FirstOrDefault(x =>
-                (x.RentedByPlayer || x.BuildingOwnedByPlayer) && x.businessTypeName != "ba:businesstype_empty");
+        // Prefer a player store; fall back to ANY business with staff + a schedule so the
+        // write-path can be exercised even on an early-game save with no hired employees.
+        private (BuildingRegistration b, EmployeeInstance e)? FirstStaffedStore()
+        {
+            var regs = SaveGameManager.Current?.BuildingRegistrations;
+            if (regs == null) return null;
+            var ordered = regs
+                .OrderByDescending(x => x.RentedByPlayer || x.BuildingOwnedByPlayer);
+            foreach (var b in ordered)
+            {
+                if (b.scheduleDays == null || b.scheduleDays.Count == 0) continue;
+                if (b.businessTypeName == "ba:businesstype_empty") continue;
+                var e = EmployeeHelper.GetEmployeeInstances(new EmployeeInstancesQueryInfo { withAssignedAddress = b.Address }).FirstOrDefault();
+                if (e != null) return (b, e);
+            }
+            return null;
+        }
 
         private void ProbeReassignTask(out string? empId, out string? storeSig)
         {
             empId = null; storeSig = null;
-            var b = FirstStore();
-            if (b == null) { Log("no player store"); return; }
-            storeSig = b.Address.ToString();
-            var emp = EmployeeHelper.GetEmployeeInstances(new EmployeeInstancesQueryInfo { withAssignedAddress = b.Address }).FirstOrDefault();
-            if (emp == null) { Log("store has no employees"); return; }
-            empId = emp.id;
-            Log($"emp {emp.id} stations before = [{string.Join(",", emp.assignedWorkStationItems)}]");
-            // Non-destructive: just re-run the game's own recompute and log. A real reassignment
-            // needs a target station id which we don't want to guess blindly in a probe.
+            var hit = FirstStaffedStore();
+            if (hit == null) { Log("no staffed business anywhere in this save"); return; }
+            var (b, emp) = hit.Value;
+            storeSig = b.Address.ToString(); empId = emp.id;
+            bool playerOwned = b.RentedByPlayer || b.BuildingOwnedByPlayer;
+            Log($"target '{b.BusinessName}' playerOwned={playerOwned} emp={emp.id} " +
+                $"stations before = [{string.Join(",", emp.assignedWorkStationItems)}]");
             emp.UpdateAssignedWorkStationItems();
             emp.UpdateWeeklyHoursAndDays();
             Log($"emp {emp.id} stations after recompute = [{string.Join(",", emp.assignedWorkStationItems)}]");
@@ -158,22 +176,40 @@ namespace StoreManagerProbe
 
         private void ProbeWriteShift()
         {
-            var b = FirstStore();
-            if (b?.scheduleDays == null || b.scheduleDays.Count == 0) { Log("no schedule"); return; }
-            var emp = EmployeeHelper.GetEmployeeInstances(new EmployeeInstancesQueryInfo { withAssignedAddress = b.Address }).FirstOrDefault();
-            if (emp == null) { Log("no employee"); return; }
-            var day = b.scheduleDays[0];
+            var hit = FirstStaffedStore();
+            if (hit == null) { Log("no staffed business"); return; }
+            var (b, emp) = hit.Value;
+            var day = b.scheduleDays.FirstOrDefault(d => d.isOpen) ?? b.scheduleDays[0];
             int before = day.workShifts.Count;
             var shift = new WorkShift { startingHour = 9, endingHour = 13, employeeId = emp.id, itemInstanceId = "" };
             day.AddWorkShift(shift);
             emp.UpdateWeeklyHoursAndDays();
-            Log($"day {day.day}: shifts {before} -> {day.workShifts.Count} (added 09-13 for {emp.id})");
+            Log($"'{b.BusinessName}' day={day.day}: shifts {before} -> {day.workShifts.Count} (added 09-13 for {emp.id})");
             _addedShiftDay = day;
             _addedShift = shift;
         }
 
         private ScheduleDay? _addedShiftDay;
         private WorkShift? _addedShift;
+
+        private void ProbeDeliveryContract()
+        {
+            var contracts = SaveGameManager.Current?.DeliveryContracts;
+            if (contracts == null || contracts.Count == 0) { Log("no delivery contracts"); return; }
+            var c = contracts[0];
+            Log($"contract business={c.businessAddress} wholesale={c.wholesaleAddress} enabled={c.enabled} " +
+                $"repeating={c.repeatingOrder} nextDay={c.nextDeliveryDay} items={c.items?.Count} " +
+                $"totalPerDelivery={c.TotalPricePerDelivery:F0}");
+            if (c.items != null && c.items.Count > 0)
+            {
+                var it = c.items[0];
+                int before = it.amount;
+                it.amount = before + 5;   // in-memory only; never saved
+                Log($"  item '{it.itemName}' amount {before} -> {it.amount}; new totalPerDelivery={c.TotalPricePerDelivery:F0}");
+                it.amount = before;       // restore
+                Log($"  restored to {it.amount}");
+            }
+        }
 
         private void Recheck(string? empId, string? storeSig)
         {

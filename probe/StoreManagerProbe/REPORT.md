@@ -23,18 +23,27 @@ last save and ran headless. No Unity needed.
 | Exceptions from mod/probe | ✅ **none** |
 | Save files modified by the run | ✅ **none** (byte-identical before/after — `LoadAsync` doesn't write) |
 
-## Still open — needs a save WITH hired employees
+## Write-path — restock CONFIRMED, task/shift blocked by save content
 
-The test save's businesses had **no staff** (`store has no employees`), so probes #1 (reassign
-task) and #2 (write shift) couldn't exercise a real `EmployeeInstance`. The *read* path is fully
-proven; the one remaining question is behavioural:
+**Probe #3 (restock) — ✅ verified in-game.** `SaveGameManager.Current.DeliveryContracts` had
+1 contract for Unity Grill (wholesale `ba:street_twelfthstreet 13`, 9 items, `TotalPricePerDelivery`
+5238). Bumping `DeliveryContractItem.amount` 500→505 on `ba:itemname_sodacan` recomputed
+`TotalPricePerDelivery` to 5239 live — the mod's restock path (`GameBindings.PlaceRestockOrder`
+via delivery contracts) works. Restored cleanly.
+
+**Probes #1 / #2 (task / shift) — blocked by the save, not by capability.** The DUMP reported
+`staffedBusinesses=0` across **all 885** building registrations — this day-8 save has no hired
+employees anywhere, so there's no real `EmployeeInstance` to reassign or roster. The APIs used
+(`EmployeeInstance.assignedWorkStationItems` + `UpdateAssignedWorkStationItems()`,
+`ScheduleDay.AddWorkShift`) are the game's own, so confidence is high — but the behavioural
+"does the sim keep it" check needs **a save where the player has hired staff**.
 
 | Probe | Result |
 |-------|--------|
-| 1 — reassign task (`assignedWorkStationItems` / `EmployeeStationController`) | ⏳ needs a staffed save |
-| 2 — write shift (`ScheduleDay.AddWorkShift`) | ⏳ needs a staffed save — but it's the game's own method, low risk |
-| 2 — write shift (`ScheduleAutoFiller`) | ⏳ ctor `(employees, registration, day)` confirmed; run it on a staffed save |
-| 3 — trigger restock | ⏳ wholesale purchase path still `// VERIFY` |
+| 1 — reassign task | ⏳ needs a save with hired employees (this save: 0 staff) |
+| 2 — write shift (`ScheduleDay.AddWorkShift`) | ⏳ same — game's own method, low risk |
+| 2 — write shift (`ScheduleAutoFiller`) | ⏳ ctor `(employees, registration, day)` confirmed; run on a staffed save |
+| 3 — restock (`DeliveryContract`) | ✅ **verified** — `item.amount` write recomputes cost |
 
 ## Environment
 - Game: Steam Build 3670, **Mono** (managed DLLs are real .NET).

@@ -42,12 +42,12 @@ path and a few `// VERIFY` field names. Everything else is proven.
   `ModManifest.asset` is not read at runtime. (For the Workshop upload later, the SDK route in
   `MANIFEST-SETUP.md` still applies.)
 
-### 2. Phase 0 — one loose end  *(~1–2 hours, needs a staffed save)*
-- Load a save that has **hired employees** at a store. Run the probe (`--probe`).
-- Confirm probe #1 (a mod-set `assignedWorkStationItems` sticks) and #2 (`ScheduleDay.AddWorkShift`
-  shows in the BizMan schedule and the employee turns up).
-- Resolve the remaining `// VERIFY` notes in `GameBindings.cs` — the wholesale purchase path is
-  the only non-trivial one; the rest are field-name confirmations you can read off the probe dump.
+### 2. Phase 0 — one loose end  *(~30 min, needs a staffed save)*
+- Read path ✅ and restock write-path ✅ both verified in-game already.
+- Only left: on a save that has **hired employees**, run the probe (`--probe`) and confirm
+  probe #1 (a mod-set `assignedWorkStationItems` sticks) and #2 (`ScheduleDay.AddWorkShift`
+  shows in the BizMan schedule, employee turns up). The test save had 0 staff anywhere.
+- Then clear the last few `// VERIFY` field-name notes off the probe dump.
 
 ### 3. Phase 1 — core, one store  *(build against the now-real GameBindings)*
 - Wire a minimal hiring entry point (extend `ManagerDirectory.AssignManager`) — a debug

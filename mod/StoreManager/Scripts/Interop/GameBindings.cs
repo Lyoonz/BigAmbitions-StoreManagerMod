@@ -115,10 +115,13 @@ namespace StoreManager.Interop
     /// </summary>
     public sealed class GameBindingsLive : IGameBindings
     {
-        // Game skill keys (0–100 float). VERIFY exact strings against SkillHelper.AllSkillNames.
-        private const string SkillManagement = "ba:skill_storemanager";
-        private const string SkillSales = "ba:skill_sales";
-        private const string SkillRestocking = "ba:skill_stocking";
+        // Game skill keys (0–100 float, keyed by name). Phase 0 confirmed there is NO
+        // "ba:skill_storemanager" — the game's manager skills are hrmanager / logisticsmanager /
+        // pricingmanager. So the mod's management competence is its own 1–5 value on
+        // StoreManagerData (not a game skill); GetEmployeeSkill maps the *trainable* skills only.
+        private const string SkillManagement = "ba:skill_hrmanager";        // closest proxy when a game skill is needed
+        private const string SkillSales = "ba:skill_customerservice";
+        private const string SkillRestocking = "ba:skill_purchasingagent";  // VERIFY: stocking-adjacent skill name
         private const string SkillCustomerService = "ba:skill_customerservice";
 
         public event Action? DayElapsed;
@@ -306,22 +309,51 @@ namespace StoreManager.Interop
         }
 
         // ── restock ─────────────────────────────────────────────────────────────
+        //  Phase 0: the real path is the store's recurring DeliveryContract, not a one-shot buy.
+        //  SaveGameManager.Current.DeliveryContracts : List<DeliveryContract>
+        //  DeliveryContract { enabled, repeatingOrder, nextDeliveryDay, wholesaleAddress,
+        //                     businessAddress, deliveryFee, items:List<DeliveryContractItem> }
+        //  DeliveryContractItem { itemName, amount, amountOrderedThisWeek }
+        //  The game processes contracts on nextDeliveryDay and charges automatically.
+        //  DeliveryHelper.CanModifyContract(contract.nextDeliveryDay) gates edits.
+
+        private static IEnumerable<DeliveryContract> ContractsFor(BuildingRegistration b) =>
+            SaveGameManager.Current.DeliveryContracts.Where(c => c.businessAddress.Equals(b.Address));
+
         public IEnumerable<(GameRef product, int shortfall)> GetLowStock(GameRef store)
         {
-            // VERIFY: enumerate shelf ItemInstances for the store, compare stock vs max capacity
-            // (CargoInstance.GetMaxStockCapacity). ReStockingHelper works on List<ItemInstance>.
-            yield break;
+            var b = store.As<BuildingRegistration>();
+            if (b == null) yield break;
+            // A store is "low" on an item its contract under-orders relative to weekly sell-through.
+            // VERIFY: the exact sell-through read (BusinessHelper iterates deliveryContract.items).
+            foreach (var c in ContractsFor(b))
+                foreach (var it in c.items)
+                    if (it.amount == 0)
+                        yield return (new GameRef(it.itemName, it.itemName, it), 1);
         }
 
         public bool PlaceRestockOrder(GameRef store, GameRef product, int quantity, out decimal cost)
         {
             cost = 0m;
-            // VERIFY: wholesale/importer purchase path. ReStockingHelper.RedistributeStockByPercentage
-            // only moves warehouse→shelf; actual buying is a supplier/delivery contract + ChangeMoneySafe.
-            return false;
+            var b = store.As<BuildingRegistration>();
+            var item = product.As<DeliveryContractItem>();
+            if (b == null || item == null) return false;
+            var contract = ContractsFor(b).FirstOrDefault(c => c.items.Contains(item));
+            if (contract == null || !DeliveryHelper.CanModifyContract(contract.nextDeliveryDay)) return false;
+            item.amount += quantity;
+            contract.enabled = true;
+            contract.repeatingOrder = true;
+            cost = (decimal)contract.TotalPricePerDelivery;   // charged by the game on delivery day
+            return true;
         }
 
-        public decimal GetStockOnHandValue(GameRef store) => 0m; // VERIFY
+        public decimal GetStockOnHandValue(GameRef store)
+        {
+            var b = store.As<BuildingRegistration>();
+            if (b == null) return 0m;
+            // VERIFY: sum shelf CargoInstance amounts * wholesale price. Not needed for v1's digest.
+            return 0m;
+        }
 
         // ── complaints ──────────────────────────────────────────────────────────
         public IEnumerable<GameRef> GetOpenComplaints(GameRef store)

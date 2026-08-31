@@ -10,9 +10,18 @@ auto-loaded a save and confirmed every read binding against live data — `Build
 `GetAvgDailyIncome`, `TimeHelper.CurrentDay/GetDayOfWeek` — with zero exceptions and zero save
 writes. See `probe/StoreManagerProbe/REPORT.md`.
 
-**Still outstanding:** the write-path behavioural check (does the sim keep a mod-written
-task/shift) needs a save with hired employees; the test save had none. Plus the wholesale
-purchase path and a few field names behind `// VERIFY`.
+**Restock write-path CONFIRMED in-game:** the store's `SaveGameManager.Current.DeliveryContracts`
+entry — modifying `DeliveryContractItem.amount` recomputes `DeliveryContract.TotalPricePerDelivery`
+live. `GameBindings.PlaceRestockOrder` now uses this.
+
+**Still outstanding:** the task/shift write-path behavioural check needs a save with hired
+employees — the test save had `staffedBusinesses=0` across all 885 registrations. The APIs
+(`assignedWorkStationItems`, `ScheduleDay.AddWorkShift`) are the game's own.
+
+**Correction from Phase 0:** there is **no `ba:skill_storemanager`** game skill. The game's
+manager skills are `hrmanager` / `logisticsmanager` / `pricingmanager`. The mod's management
+competence is its own 1–5 value on `StoreManagerData`, not a game skill — which is already how
+the domain layer models it.
 
 ## Assemblies & namespaces
 
