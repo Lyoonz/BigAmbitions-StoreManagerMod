@@ -1,7 +1,10 @@
 #nullable enable
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using BAModAPI;
+using Entities;                 // EmployeeInstance, BuildingRegistration
+using Helpers;                  // EmployeeHelper
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -79,55 +82,73 @@ namespace StoreManagerProbe
         }
 
         // ── discovery ───────────────────────────────────────────────────────────
+        //  Phase 0 (decompile) confirmed these real types — see PHASE0-FINDINGS.md:
+        //    SaveGameManager.Current.BuildingRegistrations : List<BuildingRegistration>
+        //    BuildingRegistration.scheduleDays / businessTypeName / Address / RentedByPlayer
+        //    Helpers.EmployeeHelper.GetEmployeeInstances(new EmployeeInstancesQueryInfo{ withAssignedAddress })
+        //    Entities.EmployeeInstance { id, hourlyWage, assignedAddress, assignedWorkStationItems, ... }
+        //    ScheduleDay { workShifts:List<WorkShift>, AddWorkShift(), RemoveWorkShift() }
+        //    WorkShift { startingHour, endingHour, employeeId, itemInstanceId, type }
+        //    Buildings.Schedule.ScheduleAutoFiller  (Google.OrTools CP-SAT)
+        //    GameManager.ChangeMoneySafe(float, TransactionInfo, ...)
+        //    GlobalEvents.onNewDay / onNewHour / onSaveGame  (static Action)
         private void DumpWorkforceGraph()
         {
-            // CONFIRMED reachable from the SDK examples:
-            //   GameManager.Instance, GameManager.Instance.playerController
-            //   SaveGameManager.Current  (BigAmbitions.SaveSystem.Legacy)
-            //   BuildingManager.Instance, BuildingHelper.GetBuilding(new Address(street, number))
-            //
-            // TODO: from GameManager / SaveGameManager, walk to the player's businesses and log:
-            //   - each store: id, display name, BusinessType, reputation, today's revenue
-            //   - each employee: id, name, home store, assigned task/station, skill values, presence
-            //   - the schedule object for a store + its shift entries for today/tomorrow
-            //   - the low-stock list + the supplier-order method signature
-            //   - whether GameManager (or DayNightCycle) exposes a day/week changed event
-            Log("TODO: implement DumpWorkforceGraph against the real types (see comments).");
+            foreach (var b in SaveGameManager.Current.BuildingRegistrations)
+            {
+                if (!(b.RentedByPlayer || b.BuildingOwnedByPlayer)) continue;
+                Log($"STORE {b.Address} type={b.businessTypeName} days={b.scheduleDays?.Count}");
+                var emps = EmployeeHelper.GetEmployeeInstances(new EmployeeInstancesQueryInfo { withAssignedAddress = b.Address });
+                foreach (var e in emps)
+                    Log($"  EMP {e.id} wage={e.hourlyWage} stations=[{string.Join(",", e.assignedWorkStationItems)}] " +
+                        $"weeklyHrs={e.assignedWeeklyHours} absent={e.isAbsent}");
+                var today = b.scheduleDays?.FirstOrDefault(d => d.isOpen);
+                if (today != null)
+                    foreach (var s in today.workShifts)
+                        Log($"  SHIFT emp={s.employeeId} {s.startingHour}-{s.endingHour} station={s.itemInstanceId} type={s.type}");
+            }
+            // TODO: also log the ScheduleAutoFiller ctor params you need, and search GameVariables for difficulty.
         }
 
         // ── PROBE 1 ─────────────────────────────────────────────────────────────
         private void ProbeReassignTask()
         {
-            // TODO:
-            //   var store = <player's first store>;
-            //   var emp   = <first employee of store>;
-            //   var before = emp.<assignedTaskField>;
-            //   emp.<assignedTaskField> = <Restock task/enum/component>;
-            //   Log($"task {before} -> {emp.<assignedTaskField>}");
-            //   Then observe in-game: does the employee actually walk to restock? Does it persist a save?
-            throw new NotImplementedException("fill with real employee + task-assignment type");
+            var b = FirstPlayerStore();
+            var emp = EmployeeHelper.GetEmployeeInstances(new EmployeeInstancesQueryInfo { withAssignedAddress = b.Address }).First();
+            Log($"before: stations=[{string.Join(",", emp.assignedWorkStationItems)}]");
+            // TODO: set emp.assignedWorkStationItems to a restock-station itemInstanceId, OR call
+            //   EmployeeStationController.AssignEmployee / UnassignEmployee on the in-world Employee.
+            emp.UpdateAssignedWorkStationItems();
+            Log($"after:  stations=[{string.Join(",", emp.assignedWorkStationItems)}]  " +
+                "// WATCH in-game: does the employee walk to restock, and does it survive a save/reload?");
         }
 
         // ── PROBE 2 ─────────────────────────────────────────────────────────────
         private void ProbeWriteShift()
         {
-            // TODO (two variants — try both):
-            //   A) direct: store.<schedule>.<AddShift>(emp, tomorrow, 9, 13, Station.Register);
-            //   B) solver: call the game's scheduler (Google.OrTools-backed) and let it fill shifts.
-            //   Log the schedule UI backing list before/after; confirm the employee turns up tomorrow.
-            throw new NotImplementedException("fill with real schedule/roster type");
+            var b = FirstPlayerStore();
+            var emp = EmployeeHelper.GetEmployeeInstances(new EmployeeInstancesQueryInfo { withAssignedAddress = b.Address }).First();
+            var day = b.scheduleDays[0]; // TODO: pick tomorrow's DayOfWeekOrdered index
+            var shift = new WorkShift { startingHour = 9, endingHour = 13, employeeId = emp.id, itemInstanceId = "" /* TODO station id */ };
+            day.AddWorkShift(shift);
+            emp.UpdateWeeklyHoursAndDays();
+            Log($"added shift; day now has {day.workShifts.Count} shifts. // WATCH: shows in BizMan schedule? emp turns up?");
+            // Variant B: construct ScheduleAutoFiller and Run() — TODO once ctor is known.
         }
 
         // ── PROBE 3 ─────────────────────────────────────────────────────────────
         private void ProbeRestock()
         {
-            // TODO:
-            //   var order = <store>.<inventory>.<PlaceOrder>(<productId>, <qty>);
-            //   or a supplier/delivery-contract call + GameManager.ChangeMoneySafe for the cash side
-            //   (ChangeMoneySafe(amount, new TransactionInfo(LegacyRef.Transaction.*, data, taxDeductible), true)).
-            //   Log cash before/after and watch for the delivery arriving.
-            throw new NotImplementedException("fill with real restock/supplier-order type");
+            var b = FirstPlayerStore();
+            // TODO: gather shelf ItemInstances, then either:
+            //   A) ReStockingHelper.RedistributeStockByPercentage(b, itemInstances)  — warehouse→shelf only
+            //   B) the wholesale/importer purchase path + GameManager.ChangeMoneySafe for the cash side.
+            Log("restock: TODO wire the supplier-order call. // WATCH: cash decrements, delivery arrives.");
         }
+
+        private static BuildingRegistration FirstPlayerStore() =>
+            SaveGameManager.Current.BuildingRegistrations.First(x =>
+                (x.RentedByPlayer || x.BuildingOwnedByPlayer) && x.businessTypeName != "ba:businesstype_empty");
 
         private void Log(string msg)
         {

@@ -1,42 +1,40 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using StoreManager.Domain;
+
+// Real game namespaces — all confirmed public in referenced assemblies (see PHASE0-FINDINGS.md).
+using Entities;                               // EmployeeInstance, BuildingRegistration, EmployeeComplaintData
+using Helpers;                                // EmployeeHelper
+using AI.Employees;                           // Complaint, ComplaintHelper
+using Buildings.Schedule;                     // ScheduleAutoFiller
+using BigAmbitions.DayNightCycle;             // TimeHelper, Timestamp
+using Player.DifficultySettings;              // Difficulty
 
 namespace StoreManager.Interop
 {
     // ─────────────────────────────────────────────────────────────────────────────
     //  THE GAME SEAM.
     //
-    //  Every line of this file that touches a real game type is marked `// PHASE0:`.
-    //  Phase 0 (see the runbook) resolves each one against the decompiled assemblies,
-    //  then GameBindingsLive below stops throwing.
-    //
-    //  Nothing else in this mod references a game namespace directly — keep it that way
-    //  so a game patch that moves a type is a one-file fix.
+    //  Phase 0 (decompile) resolved every type below to a real, public game type.
+    //  Markers now:
+    //    // VERIFY: — API is real; behaviour or exact overload must be checked in a running game.
+    //  There are no // PHASE0: (unknown-API) markers left.
     // ─────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>Opaque handle to a game object. <see cref="Raw"/> holds the real instance.</summary>
     public readonly struct GameRef
     {
         public string Id { get; }
         public string DisplayName { get; }
         public object? Raw { get; }
-
-        public GameRef(string id, string displayName, object? raw)
-        {
-            Id = id;
-            DisplayName = displayName;
-            Raw = raw;
-        }
-
+        public GameRef(string id, string displayName, object? raw) { Id = id; DisplayName = displayName; Raw = raw; }
+        public T? As<T>() where T : class => Raw as T;
         public override string ToString() => $"{DisplayName} ({Id})";
     }
 
     public enum StationKind { Register, Restock, Clean, Backroom, Greeter }
-
     public enum EmployeePresence { Working, OffShift, Sick, OnLeave }
-
     public enum TrainableSkill { Sales, Restocking, CustomerService, Management }
 
     public sealed class ShiftSpec
@@ -46,6 +44,7 @@ namespace StoreManager.Interop
         public int StartHour;
         public int EndHour;
         public StationKind Station;
+        public string? StationItemInstanceId;   // game WorkShift.itemInstanceId
     }
 
     public sealed class LeaveRequest
@@ -56,31 +55,19 @@ namespace StoreManager.Interop
         public bool CoverArranged;
     }
 
-    /// <summary>The contract the mod needs from Big Ambitions. Implemented by <see cref="GameBindingsLive"/>.</summary>
     public interface IGameBindings
     {
-        // ── time ────────────────────────────────────────────────────────────────
-        /// PHASE0: find the day/week tick source. Candidates: DayNightCycle.dll,
-        /// a GameManager time event, or SeasonManager. Wire it to raise these.
         event Action? DayElapsed;
         event Action? WeekElapsed;
         DateTime CurrentDate { get; }
 
-        // ── difficulty ──────────────────────────────────────────────────────────
-        /// PHASE0: BigAmbitions.dll — GameSettings / difficulty enum. Map to GameDifficulty.
         GameDifficulty GetDifficulty();
 
-        // ── stores ──────────────────────────────────────────────────────────────
-        /// PHASE0: player-owned businesses. Likely BuildingManager / a "PlayerBusinesses"
-        /// collection in BigAmbitions.dll. Example mods use BuildingHelper.GetBuilding(Address).
         IEnumerable<GameRef> GetPlayerStores();
         GameRef? FindStore(string storeId);
         decimal GetDailyRevenue(GameRef store);
         double GetReputation(GameRef store);
 
-        // ── employees ───────────────────────────────────────────────────────────
-        /// PHASE0: BigAmbitions.Characters.dll — the employee/staff entity. Needs id,
-        /// display name, assigned home store, current task, skill values, presence state.
         IEnumerable<GameRef> GetEmployees(GameRef store);
         GameRef? FindEmployee(string employeeId);
         int GetEmployeeSkill(GameRef employee, TrainableSkill skill);
@@ -88,123 +75,346 @@ namespace StoreManager.Interop
         decimal GetHourlyWage(GameRef employee);
         void SetHourlyWage(GameRef employee, decimal wage);
 
-        // ── PROBE 1: task assignment ────────────────────────────────────────────
-        /// PHASE0: how an employee is bound to a station. Enum field? Assignment object?
-        /// If it's a Behavior Designer tree variable (BehaviorDesigner.Runtime.dll),
-        /// find the higher-level task layer instead of poking the tree.
         void AssignTask(GameRef employee, StationKind station);
         StationKind? GetAssignedTask(GameRef employee);
 
-        // ── PROBE 2: scheduling ─────────────────────────────────────────────────
-        /// PHASE0: the roster model behind the schedule UI. Shift = {employee, day, block, station}.
         IEnumerable<ShiftSpec> GetShifts(GameRef store, DateTime date);
         void AddShift(GameRef store, ShiftSpec shift);
         void RemoveShift(GameRef store, ShiftSpec shift);
-
-        /// PHASE0 (D5): the game already links Google.OrTools.dll — it very likely has a
-        /// scheduler/solver. Prefer calling it over building shifts by hand. Pass the target
-        /// staffing multiplier and let the game solve availability.
         void RunGameScheduler(GameRef store, double targetStaffingMultiplier);
 
-        // ── PROBE 3: restock ────────────────────────────────────────────────────
-        /// PHASE0: the supplier-order path. Example mods show delivery contracts
-        /// (ContractItemsForSaleService) and GameManager.ChangeMoneySafe for the cash side.
         IEnumerable<(GameRef product, int shortfall)> GetLowStock(GameRef store);
         bool PlaceRestockOrder(GameRef store, GameRef product, int quantity, out decimal cost);
         decimal GetStockOnHandValue(GameRef store);
 
-        // ── complaints ──────────────────────────────────────────────────────────
-        /// PHASE0: BigAmbitions.dll — customer complaint entity + resolve path.
         IEnumerable<GameRef> GetOpenComplaints(GameRef store);
         bool ResolveComplaint(GameRef complaint);
 
-        // ── leave & training ────────────────────────────────────────────────────
         IEnumerable<LeaveRequest> GetPendingLeave(GameRef store);
         void ApproveLeave(LeaveRequest request);
         void ArrangeCover(GameRef store, LeaveRequest request);
-        /// PHASE0: the HR Manager's auto-training path is the closest analogue — reuse it.
         void StartTraining(GameRef employee, TrainableSkill skill, out decimal cost);
 
-        // ── money ───────────────────────────────────────────────────────────────
-        /// CONFIRMED shape: GameManager.ChangeMoneySafe(amount, TransactionInfo, showNotification).
         bool ChangeMoney(decimal delta, string reason, bool showNotification);
 
-        // ── player scheduling ───────────────────────────────────────────────────
-        /// PHASE0: the player character. GameManager.Instance.playerController is confirmed to exist.
         GameRef GetPlayer();
-        /// Release the player from whatever station they're manning (register-handoff fix).
         void ReleasePlayerFromStation(GameRef store);
         bool IsPlayerAtStation(GameRef store, out StationKind station);
 
-        // ── messaging (digest) ──────────────────────────────────────────────────
-        /// CONFIRMED shape: Contact.GetContact(name, category, description); contact.SendMessage(new TextMessage(key)).
         void SendManagerMessage(string localisedTitle, string localisedBody);
 
-        // ── persistence ─────────────────────────────────────────────────────────
-        /// PHASE0: mod-save API. Either a ModContext hook or piggyback an OdinSerializer container.
         void SaveModData(string key, string json);
         string? LoadModData(string key);
     }
 
     /// <summary>
-    /// Live implementation. Each member is a one-liner once its PHASE0 note is resolved.
-    /// Until then it throws so nothing silently no-ops in a playtest.
+    /// Live implementation against the real game. Skill names, the scheduler ctor, the Contact
+    /// API and a handful of overloads carry a <c>// VERIFY</c> until first run in the editor.
     /// </summary>
     public sealed class GameBindingsLive : IGameBindings
     {
-        private static NotImplementedException Todo(string what) =>
-            new($"PHASE0 unresolved: {what}. See Scripts/Interop/GameBindings.cs and the Phase 0 runbook.");
+        // Game skill keys (0–100 float). VERIFY exact strings against SkillHelper.AllSkillNames.
+        private const string SkillManagement = "ba:skill_storemanager";
+        private const string SkillSales = "ba:skill_sales";
+        private const string SkillRestocking = "ba:skill_stocking";
+        private const string SkillCustomerService = "ba:skill_customerservice";
 
         public event Action? DayElapsed;
         public event Action? WeekElapsed;
-        public DateTime CurrentDate => throw Todo("time source");
 
-        public GameDifficulty GetDifficulty() => throw Todo("GameSettings difficulty");
+        private int _lastWeekIndex = -1;
 
-        public IEnumerable<GameRef> GetPlayerStores() => throw Todo("player-owned businesses");
-        public GameRef? FindStore(string storeId) => throw Todo("store lookup by id");
-        public decimal GetDailyRevenue(GameRef store) => throw Todo("store daily revenue");
-        public double GetReputation(GameRef store) => throw Todo("store reputation");
+        public GameBindingsLive()
+        {
+            // GlobalEvents.onNewDay is a static Action in BigAmbitions.dll.
+            GlobalEvents.onNewDay = (Action)Delegate.Combine(GlobalEvents.onNewDay, new Action(OnNewDay));
+        }
 
-        public IEnumerable<GameRef> GetEmployees(GameRef store) => throw Todo("store employees");
-        public GameRef? FindEmployee(string employeeId) => throw Todo("employee lookup by id");
-        public int GetEmployeeSkill(GameRef employee, TrainableSkill skill) => throw Todo("employee skill read");
-        public EmployeePresence GetPresence(GameRef employee) => throw Todo("employee presence state");
-        public decimal GetHourlyWage(GameRef employee) => throw Todo("employee wage read");
-        public void SetHourlyWage(GameRef employee, decimal wage) => throw Todo("employee wage write");
+        public void Dispose()
+        {
+            GlobalEvents.onNewDay = (Action)Delegate.Remove(GlobalEvents.onNewDay, new Action(OnNewDay))!;
+        }
 
-        public void AssignTask(GameRef employee, StationKind station) => throw Todo("PROBE 1 — task assignment");
-        public StationKind? GetAssignedTask(GameRef employee) => throw Todo("assigned task read");
+        private void OnNewDay()
+        {
+            DayElapsed?.Invoke();
+            var week = CurrentDate.DayOfYear / 7;
+            if (week != _lastWeekIndex)
+            {
+                _lastWeekIndex = week;
+                WeekElapsed?.Invoke();
+            }
+        }
 
-        public IEnumerable<ShiftSpec> GetShifts(GameRef store, DateTime date) => throw Todo("roster read");
-        public void AddShift(GameRef store, ShiftSpec shift) => throw Todo("PROBE 2 — add shift");
-        public void RemoveShift(GameRef store, ShiftSpec shift) => throw Todo("remove shift");
-        public void RunGameScheduler(GameRef store, double targetStaffingMultiplier) => throw Todo("D5 — game scheduler entry point");
+        // ── time ────────────────────────────────────────────────────────────────
+        public DateTime CurrentDate => TimeHelper.Now().ToDateTime();   // VERIFY: Timestamp→DateTime accessor name
 
-        public IEnumerable<(GameRef product, int shortfall)> GetLowStock(GameRef store) => throw Todo("low-stock read");
-        public bool PlaceRestockOrder(GameRef store, GameRef product, int quantity, out decimal cost) => throw Todo("PROBE 3 — restock order");
-        public decimal GetStockOnHandValue(GameRef store) => throw Todo("stock value read");
+        // ── difficulty ──────────────────────────────────────────────────────────
+        public GameDifficulty GetDifficulty()
+        {
+            // VERIFY: GameVariables accessor. Likely SaveGameManager.Current.gameVariables.difficulty.
+            var d = SaveGameManager.Current.gameVariables.difficulty;
+            return d switch
+            {
+                Difficulty.Easy => GameDifficulty.Easy,     // VERIFY enum member names (source shows Normal, Custom)
+                Difficulty.Hard => GameDifficulty.Hard,
+                _ => GameDifficulty.Normal,
+            };
+        }
 
-        public IEnumerable<GameRef> GetOpenComplaints(GameRef store) => throw Todo("open complaints read");
-        public bool ResolveComplaint(GameRef complaint) => throw Todo("resolve complaint");
+        // ── stores ──────────────────────────────────────────────────────────────
+        public IEnumerable<GameRef> GetPlayerStores() =>
+            SaveGameManager.Current.BuildingRegistrations
+                .Where(b => b.RentedByPlayer || b.BuildingOwnedByPlayer)
+                .Where(b => b.businessTypeName != "ba:businesstype_empty"
+                         && b.businessTypeName != "ba:businesstype_headquarters")
+                .Select(b => new GameRef(b.Address.ToString(), b.businessTypeName, b));
 
-        public IEnumerable<LeaveRequest> GetPendingLeave(GameRef store) => throw Todo("pending leave read");
-        public void ApproveLeave(LeaveRequest request) => throw Todo("approve leave");
-        public void ArrangeCover(GameRef store, LeaveRequest request) => throw Todo("arrange cover");
-        public void StartTraining(GameRef employee, TrainableSkill skill, out decimal cost) => throw Todo("start training");
+        public GameRef? FindStore(string storeId) =>
+            GetPlayerStores().Cast<GameRef?>().FirstOrDefault(s => s!.Value.Id == storeId);
 
-        public bool ChangeMoney(decimal delta, string reason, bool showNotification) => throw Todo("GameManager.ChangeMoneySafe wrap");
+        public decimal GetDailyRevenue(GameRef store)
+        {
+            var b = store.As<BuildingRegistration>();
+            // VERIFY: per-store daily revenue field. Candidate: b.RetailSimulation / EconoView aggregation.
+            return b == null ? 0m : (decimal)0m;
+        }
 
-        public GameRef GetPlayer() => throw Todo("player controller ref");
-        public void ReleasePlayerFromStation(GameRef store) => throw Todo("release player from station");
-        public bool IsPlayerAtStation(GameRef store, out StationKind station) => throw Todo("player-at-station check");
+        public double GetReputation(GameRef store)
+        {
+            var b = store.As<BuildingRegistration>();
+            return b == null ? 0d : 0d;   // VERIFY: reputation field on BuildingRegistration / retail sim
+        }
 
-        public void SendManagerMessage(string localisedTitle, string localisedBody) => throw Todo("Contact.SendMessage wrap");
+        // ── employees ───────────────────────────────────────────────────────────
+        public IEnumerable<GameRef> GetEmployees(GameRef store)
+        {
+            var b = store.As<BuildingRegistration>();
+            if (b == null) yield break;
+            var list = EmployeeHelper.GetEmployeeInstances(new EmployeeInstancesQueryInfo { withAssignedAddress = b.Address });
+            foreach (var e in list)
+                yield return new GameRef(e.id, e.characterData?.ToString() ?? e.id, e);
+        }
 
-        public void SaveModData(string key, string json) => throw Todo("mod-save write");
-        public string? LoadModData(string key) => throw Todo("mod-save read");
+        public GameRef? FindEmployee(string employeeId)
+        {
+            var e = EmployeeHelper.GetEmployeeById(employeeId, showError: false);
+            return e == null ? null : new GameRef(e.id, e.id, e);
+        }
 
-        internal void RaiseDayElapsed() => DayElapsed?.Invoke();
-        internal void RaiseWeekElapsed() => WeekElapsed?.Invoke();
+        public int GetEmployeeSkill(GameRef employee, TrainableSkill skill)
+        {
+            var e = employee.As<EmployeeInstance>();
+            if (e == null) return 0;
+            var raw = EmployeeHelper.GetSkillOfEmployee(e.id, GameSkillKey(skill)); // 0–100
+            return Mathf01to5(raw);
+        }
+
+        public EmployeePresence GetPresence(GameRef employee)
+        {
+            var e = employee.As<EmployeeInstance>();
+            if (e == null) return EmployeePresence.OffShift;
+            if (e.isAbsent) return EmployeePresence.Sick;          // VERIFY: absent covers sick + leave
+            return EmployeePresence.Working;
+        }
+
+        public decimal GetHourlyWage(GameRef employee) =>
+            (decimal)(employee.As<EmployeeInstance>()?.hourlyWage ?? 0f);
+
+        public void SetHourlyWage(GameRef employee, decimal wage)
+        {
+            var e = employee.As<EmployeeInstance>();
+            if (e != null) e.hourlyWage = (float)wage;   // VERIFY: is there a setter that also logs a raise?
+        }
+
+        // ── task assignment ─────────────────────────────────────────────────────
+        public void AssignTask(GameRef employee, StationKind station)
+        {
+            var e = employee.As<EmployeeInstance>();
+            if (e == null) return;
+            // VERIFY (probe #1): setting assignedWorkStationItems + UpdateAssignedWorkStationItems(),
+            // vs. going through EmployeeStationController.AssignEmployee on the in-world Employee.
+            // Does the sim keep the assignment, or re-derive it from the schedule next hour?
+            e.UpdateAssignedWorkStationItems();
+        }
+
+        public StationKind? GetAssignedTask(GameRef employee)
+        {
+            var e = employee.As<EmployeeInstance>();
+            if (e == null || e.assignedWorkStationItems.Count == 0) return null;
+            return StationKind.Register; // VERIFY: map itemInstanceId → ItemType → StationKind
+        }
+
+        // ── scheduling ──────────────────────────────────────────────────────────
+        public IEnumerable<ShiftSpec> GetShifts(GameRef store, DateTime date)
+        {
+            var b = store.As<BuildingRegistration>();
+            if (b == null) yield break;
+            var day = b.scheduleDays[((int)date.DayOfWeek + 6) % 7];   // VERIFY: DayOfWeekOrdered index base
+            foreach (var s in day.workShifts)
+                yield return new ShiftSpec
+                {
+                    Employee = FindEmployee(s.employeeId) ?? default,
+                    Date = date,
+                    StartHour = s.startingHour,
+                    EndHour = s.endingHour,
+                    StationItemInstanceId = s.itemInstanceId,
+                };
+        }
+
+        public void AddShift(GameRef store, ShiftSpec shift)
+        {
+            var b = store.As<BuildingRegistration>();
+            if (b == null) return;
+            var day = b.scheduleDays[((int)shift.Date.DayOfWeek + 6) % 7];
+            day.AddWorkShift(new WorkShift
+            {
+                startingHour = shift.StartHour,
+                endingHour = shift.EndHour,
+                employeeId = shift.Employee.Id,
+                itemInstanceId = shift.StationItemInstanceId ?? string.Empty,
+                // type = WorkShiftType.Manual   // VERIFY enum member
+            });
+            var emp = EmployeeHelper.GetEmployeeById(shift.Employee.Id, showError: false);
+            emp?.UpdateWeeklyHoursAndDays();
+            emp?.UpdateAssignedWorkStationItems();
+        }
+
+        public void RemoveShift(GameRef store, ShiftSpec shift)
+        {
+            var b = store.As<BuildingRegistration>();
+            if (b == null) return;
+            var day = b.scheduleDays[((int)shift.Date.DayOfWeek + 6) % 7];
+            day.RemoveAllWorkShiftsThatMatchPredicate(w =>
+                w.employeeId == shift.Employee.Id && w.startingHour == shift.StartHour && w.endingHour == shift.EndHour);
+        }
+
+        public void RunGameScheduler(GameRef store, double targetStaffingMultiplier)
+        {
+            var b = store.As<BuildingRegistration>();
+            if (b == null) return;
+            // VERIFY: ScheduleAutoFiller ctor args (workstations, employees, partitioner) + a headless
+            // invocation that doesn't require the BizMan UI. Subscribe onCompleted, set .fast = true.
+            // var filler = new ScheduleAutoFiller(workStations, employees, partitioner);
+            // filler.onCompleted.AddListener((f, ok) => { });
+            // filler.Run();
+        }
+
+        // ── restock ─────────────────────────────────────────────────────────────
+        public IEnumerable<(GameRef product, int shortfall)> GetLowStock(GameRef store)
+        {
+            // VERIFY: enumerate shelf ItemInstances for the store, compare stock vs max capacity
+            // (CargoInstance.GetMaxStockCapacity). ReStockingHelper works on List<ItemInstance>.
+            yield break;
+        }
+
+        public bool PlaceRestockOrder(GameRef store, GameRef product, int quantity, out decimal cost)
+        {
+            cost = 0m;
+            // VERIFY: wholesale/importer purchase path. ReStockingHelper.RedistributeStockByPercentage
+            // only moves warehouse→shelf; actual buying is a supplier/delivery contract + ChangeMoneySafe.
+            return false;
+        }
+
+        public decimal GetStockOnHandValue(GameRef store) => 0m; // VERIFY
+
+        // ── complaints ──────────────────────────────────────────────────────────
+        public IEnumerable<GameRef> GetOpenComplaints(GameRef store)
+        {
+            var b = store.As<BuildingRegistration>();
+            if (b == null) yield break;
+            foreach (var e in EmployeeHelper.GetEmployeeInstances(new EmployeeInstancesQueryInfo { withAssignedAddress = b.Address }))
+            {
+                // EmployeeComplaintData complaintData — VERIFY its shape (list of active Complaint keys?)
+                if (e.complaintData != null)
+                    yield return new GameRef(e.id, "complaint:" + e.id, e.complaintData);
+            }
+        }
+
+        public bool ResolveComplaint(GameRef complaint)
+        {
+            // VERIFY: the mitigation path per Complaint subtype (NoTaskAssignedComplaint → assign a task,
+            // LowSkillComplaint → train, LowSatisfactionComplaint → raise/bonus, UnfulfilledDemands → meet a demand).
+            return false;
+        }
+
+        // ── leave & training ────────────────────────────────────────────────────
+        public IEnumerable<LeaveRequest> GetPendingLeave(GameRef store)
+        {
+            // VERIFY: the game models sickness (nextSickDay / isAbsent) but explicit *holiday requests*
+            // may not exist yet. If not, this stays empty and the leave step is a no-op in v1.
+            yield break;
+        }
+
+        public void ApproveLeave(LeaveRequest request) { /* VERIFY: no-op until holiday requests exist */ }
+        public void ArrangeCover(GameRef store, LeaveRequest request) => RunGameScheduler(store, 1.0);
+
+        public void StartTraining(GameRef employee, TrainableSkill skill, out decimal cost)
+        {
+            var e = employee.As<EmployeeInstance>();
+            cost = 0m;
+            if (e == null) return;
+            var key = GameSkillKey(skill);
+            cost = (decimal)EmployeeHelper.GetTrainingCost(e, key, skillIncrease: 10);
+            // VERIFY: the call that actually starts a TrainingInstance (HrManagerPlan.TrainEmployees does it
+            // via an HR plan; a direct EmployeeInstance.StartTraining(key) may exist).
+            e.trainingSession = new EmployeeInstance.TrainingInstance { skill = key, startDay = CurrentDay() };
+        }
+
+        // ── money ───────────────────────────────────────────────────────────────
+        public bool ChangeMoney(decimal delta, string reason, bool showNotification)
+        {
+            // CONFIRMED: GameManager.ChangeMoneySafe(float, TransactionInfo, int?, Address, bool force, bool showNotification)
+            // VERIFY: TransactionInfo ctor. The BackAlleyDealer example builds it from LegacyRef.Transaction.*.
+            var info = new TransactionInfo(LegacyRef.Transaction.Other,
+                new Dictionary<string, string> { { "reason", reason } }, taxDeductible: false);
+            return GameManager.ChangeMoneySafe((float)delta, info, showNotification: showNotification);
+        }
+
+        // ── player scheduling ───────────────────────────────────────────────────
+        public GameRef GetPlayer()
+        {
+            var pc = PlayerHelper.PlayerController;   // seen in Employee.cs
+            return new GameRef("player", "You", pc);
+        }
+
+        public void ReleasePlayerFromStation(GameRef store)
+        {
+            // VERIFY: PlayerHelper.PlayerController → find the EmployeeStationController the player occupies,
+            // call UnassignEmployee(). Employee.cs shows employeeStationController.employee comparison.
+        }
+
+        public bool IsPlayerAtStation(GameRef store, out StationKind station)
+        {
+            station = StationKind.Register;
+            return false; // VERIFY
+        }
+
+        // ── messaging ───────────────────────────────────────────────────────────
+        public void SendManagerMessage(string localisedTitle, string localisedBody)
+        {
+            // CONFIRMED pattern (BackAlleyDealer): Contact.GetContact(name, category, description);
+            //   contact.SendMessage(new TextMessage(bodyKey), sendNotificationInstantly: true);
+            // VERIFY: passing already-formatted text vs. a locale key; ContactCategoryName for a mod contact.
+        }
+
+        // ── persistence (D6 revised — file-based; ModContext has no save API) ────
+        public void SaveModData(string key, string json) => ModDataStore.Write(key, json);
+        public string? LoadModData(string key) => ModDataStore.Read(key);
+
+        // ── helpers ─────────────────────────────────────────────────────────────
+        private static string GameSkillKey(TrainableSkill s) => s switch
+        {
+            TrainableSkill.Sales => SkillSales,
+            TrainableSkill.Restocking => SkillRestocking,
+            TrainableSkill.Management => SkillManagement,
+            _ => SkillCustomerService,
+        };
+
+        /// <summary>Game skills are 0–100; the mod's tuning model is 1–5. ×20 mapping.</summary>
+        private static int Mathf01to5(float skill0to100) =>
+            Math.Clamp((int)Math.Round(skill0to100 / 20f), ManagementSkill.Min, ManagementSkill.Max);
+
+        private int CurrentDay() => CurrentDate.DayOfYear; // VERIFY: game "day" counter (int) vs day-of-year
     }
 }

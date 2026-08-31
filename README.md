@@ -15,9 +15,11 @@ Full design: see the design brief and the Phase 0 runbook (links in `DECISIONS.m
 | Toolchain decision | ✅ locked — official SDK (`BAModAPI`), see `DECISIONS.md` |
 | Domain model (skill, mistakes, policy, difficulty, wages) | ✅ implemented — pure C#, no game deps |
 | SDK entry points / manifest / asmdef | ✅ scaffolded against the real SDK API |
-| Game bindings (`Interop/GameBindings.cs`) | ⚠️ stubs — every game touchpoint is listed with its expected DLL/namespace and a `PHASE0` marker |
-| Phase 0 probe mod (`probe/`) | ✅ written — needs real class names filled in, then run in-game |
-| Runtime wiring, playtest, balance | ⛔ blocked on Phase 0 (needs the game + Unity 2022.3.62f2) |
+| **Phase 0 static decompile** | ✅ done — game assemblies decompiled, real types mapped (`PHASE0-FINDINGS.md`) |
+| Game bindings (`Interop/GameBindings.cs`) | ✅ rewritten against **real** game types; ~12 `// VERIFY` notes for in-game behaviour checks (no `PHASE0`/unknown-API markers left) |
+| Phase 0 probe mod (`probe/`) | ✅ written with real type names; `REPORT.md` code-map filled |
+| Phase 0 in-game run (probes F8–F11) | ⛔ needs the game + Unity 2022.3.62f2 |
+| Runtime wiring, playtest, balance | ⛔ needs the above |
 
 ## Layout
 

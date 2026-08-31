@@ -57,6 +57,16 @@ namespace StoreManager.Domain
         /// <summary>Tier label used in the design brief and the hiring UI.</summary>
         public string Tier => Value >= 4 ? "great" : Value == 3 ? "average" : "poor";
 
+        /// <summary>
+        /// The game stores skills as a 0–100 float keyed by name (Phase 0: <c>EmployeeInstance.GetSkillValue</c>).
+        /// The mod's 1–5 tuning scale maps ×20. HR Manager precedent: span of control also derives from
+        /// the 0–100 value (<c>HrManagerSkillValue.CalculateMaxAssignableEmployees()</c>).
+        /// </summary>
+        public float ToGameScale() => Value * 20f;
+
+        public static ManagementSkill FromGameScale(float skill0to100) =>
+            new((int)System.Math.Round(skill0to100 / 20f));
+
         public override string ToString() => $"skill {Value} ({Tier})";
     }
 }

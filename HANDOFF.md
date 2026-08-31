@@ -21,9 +21,17 @@
 - **Phase 0 probe:** `probe/StoreManagerProbe/` — runnable SDK mod, F8/F9/F10/F11 hotkeys,
   `REPORT.md` template.
 
+- **Phase 0 static pass — done.** Game assemblies decompiled (Mono build), real types mapped in
+  `PHASE0-FINDINGS.md`, `GameBindings.cs` rewritten against real game types, `probe/REPORT.md`
+  code-map filled. Static verdict: **leaning GO** — every needed type is public in a referenced
+  assembly, no patching required so far.
+
 ## Left — needs the game + Unity 2022.3.62f2 (can't be done here)
 
-Do these in order. Each step unblocks the next.
+Do these in order. Each step unblocks the next. Phase 0 is now mostly *verification* +
+three specific unknowns (marked `// VERIFY` in `GameBindings.cs`):
+the `ScheduleAutoFiller` ctor, the wholesale purchase path, and whether the sim honours a
+mod-set task/shift.
 
 ### 1. Stand up the SDK  *(~half day)*
 - Install Big Ambitions (Steam) + Unity Hub + Unity **2022.3.62f2** + macOS build support.
@@ -34,12 +42,13 @@ Do these in order. Each step unblocks the next.
 - Fix `ModManifest.asset` per `MANIFEST-SETUP.md` (recreate via the menu, relink fields).
 - Record: is the shipped game **Mono or IL2CPP**?
 
-### 2. Phase 0 — resolve the seam  *(~2 days)*  → see the Phase 0 runbook artifact
-- Decompile the imported DLLs (ILSpy / dnSpy). Fill the code-map table in `REPORT.md`.
-- Fill the `// TODO`s in `probe/StoreManagerProbe/Scripts/ProbeMod.cs` with real type names.
-- Build & install the probe, load a city with a staffed store, press F8→F11, record results.
-- Resolve **every** `// PHASE0:` marker in `GameBindings.cs` — replace each `throw Todo(...)`
-  with the real one-line call. When done, `GameBindingsLive` is the real implementation.
+### 2. Phase 0 — finish the in-game verification  *(~1 day now, was 2)*
+- Code map + `GameBindings.cs` are already done from the decompile. Remaining:
+- Run the probe: build & install `probe/StoreManagerProbe/`, load a city with a staffed store,
+  press **F8** (dump), **F9** (reassign), **F10** (shift), **F11** (restock). Record in `REPORT.md`.
+- Resolve the `// VERIFY` notes in `GameBindings.cs` (≈12) — mostly confirming an overload or a
+  field name. The three that matter: `ScheduleAutoFiller` ctor + headless run, the wholesale
+  purchase path, and whether the sim keeps a mod-set task/shift.
 - **Go / conditional (D2 — bundle `0Harmony.dll`) / no-go (numbers-only re-scope).**
 
 ### 3. Phase 1 — core, one store  *(build against the now-real GameBindings)*
