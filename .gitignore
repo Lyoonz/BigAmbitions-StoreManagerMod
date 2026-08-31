@@ -1,0 +1,32 @@
+# This repo holds only the mod source that drops into <SDK clone>/Assets/Mods/.
+# The SDK, game DLLs and Unity project are NOT vendored here.
+
+# Unity
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+*.csproj
+*.sln
+*.unityproj
+*.pidb
+*.booproj
+*.suo
+*.user
+
+# Build output
+Output/
+ModsLocal/
+
+# Imported game DLLs (never commit — licensed game content)
+**/GameDlls/
+# NOTE: a bundled Dependencies/0Harmony.dll (D2) must be force-added: git add -f
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vs/

@@ -1,0 +1,36 @@
+{
+  "storemanager_options_header": "Store Manager",
+  "storemanager_policy_staffing_label": "Staffing level",
+  "storemanager_policy_staffing_lean": "Lean",
+  "storemanager_policy_staffing_normal": "Normal",
+  "storemanager_policy_staffing_generous": "Generous",
+  "storemanager_policy_restock_cap_label": "Weekly restock budget cap",
+  "storemanager_policy_restock_cap_value": "${0}",
+  "storemanager_policy_training_budget_label": "Weekly training budget",
+  "storemanager_policy_training_budget_value": "${0}",
+  "storemanager_policy_leave_autoapprove_label": "Auto-approve leave requests",
+  "storemanager_policy_price_follow_margin_label": "Track target margin",
+
+  "storemanager_contact_name": "Store Manager",
+  "storemanager_contact_description": "Weekly reports from your store managers.",
+
+  "storemanager_digest_title": "Weekly report — {0}",
+  "storemanager_digest_line_revenue": "Revenue: ${0} ({1} vs last week)",
+  "storemanager_digest_line_restock": "Stock spend: ${0}",
+  "storemanager_digest_line_shifts": "Shifts covered: {0}/{1}",
+  "storemanager_digest_line_complaints": "Complaints resolved: {0}/{1}",
+  "storemanager_digest_line_attention": "Needs your attention: {0}",
+  "storemanager_digest_all_good": "Nothing needs your attention this week.",
+
+  "storemanager_mistake_understocked": "{0} ran out of {1}",
+  "storemanager_mistake_overstocked": "{0} over-ordered {1} — ${2} tied up",
+  "storemanager_mistake_understaffed": "{0} was understaffed on {1}",
+  "storemanager_mistake_uncovered_leave": "{0}: {1}'s leave was approved with no cover arranged",
+  "storemanager_mistake_complaint_unresolved": "{0}: {1} complaints left unresolved",
+  "storemanager_mistake_training_misspent": "{0}: training budget spent on the wrong skill",
+
+  "storemanager_hire_manager": "Hire Manager",
+  "storemanager_hire_assistant": "Hire Assistant Manager",
+  "storemanager_promote_from_within": "Promote an employee",
+  "storemanager_manager_quit": "{0} quit — {1} is now unmanaged"
+}
