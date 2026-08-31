@@ -36,6 +36,12 @@ namespace StoreManager.UI
 
             var options = new ModOptions()
                 .AddHeader("storemanager_options_header")
+                // Interim hiring controls (real UI is later polish). Act on the store you're
+                // standing in; same path as the StoreManager.Hire console command.
+                .AddButton("storemanager_btn_hire_manager", () => Debugging.StoreManagerCommands.Hire("manager", 4))
+                .AddButton("storemanager_btn_hire_assistant", () => Debugging.StoreManagerCommands.Hire("assistant", 3))
+                .AddButton("storemanager_btn_status", Debugging.StoreManagerCommands.Status)
+                .AddSplitter()
                 .AddDropdown(StaffingKey, "storemanager_policy_staffing_label", StaffingChoices,
                     (int)_policy.Staffing, i => _policy.Staffing = (StaffingLevel)i)
                 .AddSlider(RestockCapKey, "storemanager_policy_restock_cap_label", 0, 20000,

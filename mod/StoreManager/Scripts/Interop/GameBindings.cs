@@ -231,22 +231,61 @@ namespace StoreManager.Interop
         }
 
         // ── task assignment ─────────────────────────────────────────────────────
+        //  Phase 0 probe #1 finding: EmployeeInstance.assignedWorkStationItems is DERIVED —
+        //  writing it directly is wiped by UpdateAssignedWorkStationItems(). A station is
+        //  assigned by putting the employee on a WorkShift whose itemInstanceId is that station
+        //  (this is what ScheduleAutoFiller and the BizMan schedule UI do). So "assign a task"
+        //  = retarget today's shift for this employee to the wanted station's ItemInstance.
         public void AssignTask(GameRef employee, StationKind station)
         {
             var e = employee.As<EmployeeInstance>();
-            if (e == null) return;
-            // VERIFY (probe #1): setting assignedWorkStationItems + UpdateAssignedWorkStationItems(),
-            // vs. going through EmployeeStationController.AssignEmployee on the in-world Employee.
-            // Does the sim keep the assignment, or re-derive it from the schedule next hour?
-            e.UpdateAssignedWorkStationItems();
+            if (e == null || e.assignedAddress == null) return;
+            var b = SaveGameManager.Current.BuildingRegistrations.FirstOrDefault(r => r.Address.Equals(e.assignedAddress));
+            if (b?.scheduleDays == null) return;
+
+            var stationId = FindStationItemId(b, station);
+            if (stationId == null) return;
+
+            var today = b.scheduleDays[CurrentDayOfWeekIndex];
+            var shift = today.workShifts.FirstOrDefault(w => w.employeeId == e.id);
+            if (shift != null)
+            {
+                shift.itemInstanceId = stationId;
+            }
+            else
+            {
+                today.AddWorkShift(new WorkShift { startingHour = 9, endingHour = 17, employeeId = e.id, itemInstanceId = stationId });
+            }
+            e.UpdateWeeklyHoursAndDays();
         }
 
         public StationKind? GetAssignedTask(GameRef employee)
         {
             var e = employee.As<EmployeeInstance>();
-            if (e == null || e.assignedWorkStationItems.Count == 0) return null;
-            return StationKind.Register; // VERIFY: map itemInstanceId → ItemType → StationKind
+            if (e == null || e.assignedAddress == null) return null;
+            var b = SaveGameManager.Current.BuildingRegistrations.FirstOrDefault(r => r.Address.Equals(e.assignedAddress));
+            var shift = b?.scheduleDays?[CurrentDayOfWeekIndex].workShifts.FirstOrDefault(w => w.employeeId == e.id);
+            if (shift == null || string.IsNullOrEmpty(shift.itemInstanceId)) return null;
+            var item = b!.GetAssignableItems().FirstOrDefault(i => i.id == shift.itemInstanceId);
+            return StationKindFromItemName(item?.itemName);
         }
+
+        private static string? FindStationItemId(BuildingRegistration b, StationKind station)
+        {
+            foreach (var i in b.GetAssignableItems())
+                if (StationKindFromItemName(i.itemName) == station) return i.id;
+            // fall back to the first assignable station
+            return b.GetAssignableItems().FirstOrDefault()?.id;
+        }
+
+        private static StationKind? StationKindFromItemName(string? itemName) => itemName switch
+        {
+            null => null,
+            var n when n.Contains("cashregister") => StationKind.Register,
+            var n when n.Contains("cleaning") => StationKind.Clean,
+            var n when n.Contains("restock") || n.Contains("shelf") => StationKind.Restock,
+            _ => StationKind.Backroom,
+        };
 
         // ── scheduling ──────────────────────────────────────────────────────────
         public IEnumerable<ShiftSpec> GetShifts(GameRef store, int dayOfWeekIndex)

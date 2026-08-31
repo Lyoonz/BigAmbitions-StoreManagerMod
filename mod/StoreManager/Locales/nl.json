@@ -1,5 +1,8 @@
 {
   "storemanager_options_header": "Filiaalmanager",
+  "storemanager_btn_hire_manager": "Manager inhuren hier (skill 4)",
+  "storemanager_btn_hire_assistant": "Assistent inhuren hier (skill 3)",
+  "storemanager_btn_status": "Status beheerde winkels loggen",
   "storemanager_policy_staffing_label": "Bezettingsniveau",
   "storemanager_policy_staffing_lean": "Krap",
   "storemanager_policy_staffing_normal": "Normaal",

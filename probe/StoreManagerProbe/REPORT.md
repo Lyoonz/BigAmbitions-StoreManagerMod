@@ -23,7 +23,23 @@ last save and ran headless. No Unity needed.
 | Exceptions from mod/probe | ✅ **none** |
 | Save files modified by the run | ✅ **none** (byte-identical before/after — `LoadAsync` doesn't write) |
 
-## Write-path — restock CONFIRMED, task/shift blocked by save content
+## Write-path — ALL CONFIRMED in-game (2026-08-31, via an in-memory throwaway employee)
+
+The day-8 save had zero staff, so the probe injects a throwaway `EmployeeInstance` at Unity
+Grill (in memory only, removed at the end, never saved) and exercises the write path on it.
+
+| Write | Result |
+|-------|--------|
+| **Shift** — `ScheduleDay.AddWorkShift(new WorkShift{...})` | ✅ `shifts 0 → 1`; **RECHECK 20s later: `added shift still present = True`** — the sim keeps a mod-written shift |
+| **Task assignment** — `EmployeeInstance.assignedWorkStationItems` direct write | ❌ **wiped** — `stations after = []`. It is a *derived* field: `UpdateAssignedWorkStationItems()` recomputes it from the schedule |
+| **Task assignment — correct mechanism** | put the employee on a `WorkShift` whose `itemInstanceId` is the target station (`BuildingRegistration.GetAssignableItems()` → the workstations; Unity Grill had `[cleaningstation, cashregister]`). `GameBindings.AssignTask` now does this. |
+| **Restock** — `DeliveryContractItem.amount` | ✅ `500 → 505` recomputed `TotalPricePerDelivery` `5238 → 5239` |
+| Save files modified | ✅ none — byte-identical before/after every run |
+
+**Phase 0 is complete.** Every binding the mod needs — read and write — is verified against the
+running game. Verdict: **GO**, no caveats.
+
+## (historical) Write-path — restock CONFIRMED, task/shift blocked by save content
 
 **Probe #3 (restock) — ✅ verified in-game.** `SaveGameManager.Current.DeliveryContracts` had
 1 contract for Unity Grill (wholesale `ba:street_twelfthstreet 13`, 9 items, `TotalPricePerDelivery`

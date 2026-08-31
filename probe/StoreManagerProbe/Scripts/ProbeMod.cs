@@ -141,22 +141,49 @@ namespace StoreManagerProbe
             }
         }
 
-        // Prefer a player store; fall back to ANY business with staff + a schedule so the
-        // write-path can be exercised even on an early-game save with no hired employees.
+        private EmployeeInstance? _testEmp;
+
+        // Prefer a real staffed store; if the save has none (early game), inject a throwaway
+        // EmployeeInstance in memory so the write-path can still be exercised. Never saved —
+        // the game process is killed on exit so nothing persists. Removed in RECHECK.
         private (BuildingRegistration b, EmployeeInstance e)? FirstStaffedStore()
         {
             var regs = SaveGameManager.Current?.BuildingRegistrations;
             if (regs == null) return null;
-            var ordered = regs
-                .OrderByDescending(x => x.RentedByPlayer || x.BuildingOwnedByPlayer);
+            var ordered = regs.OrderByDescending(x => x.RentedByPlayer || x.BuildingOwnedByPlayer).ToList();
+
             foreach (var b in ordered)
             {
-                if (b.scheduleDays == null || b.scheduleDays.Count == 0) continue;
-                if (b.businessTypeName == "ba:businesstype_empty") continue;
+                if (b.scheduleDays == null || b.scheduleDays.Count == 0 || b.businessTypeName == "ba:businesstype_empty") continue;
                 var e = EmployeeHelper.GetEmployeeInstances(new EmployeeInstancesQueryInfo { withAssignedAddress = b.Address }).FirstOrDefault();
                 if (e != null) return (b, e);
             }
-            return null;
+
+            if (_testEmp == null)
+            {
+                var store = ordered.FirstOrDefault(x => (x.RentedByPlayer || x.BuildingOwnedByPlayer)
+                    && x.scheduleDays != null && x.scheduleDays.Count > 0 && x.businessTypeName != "ba:businesstype_empty");
+                if (store == null) return null;
+                _testEmp = EmployeeHelper.CreateAIEmployeeInstance("ba:skill_customerservice");
+                _testEmp.characterData.name = "PROBE Test Worker";
+                _testEmp.assignedAddress = store.Address;
+                _testEmp.hourlyWage = 18f;
+                EmployeeHelper.GetEmployeeInstances().Add(_testEmp);
+                EmployeeHelper.EmployeeInstancesDictionary[_testEmp.id] = _testEmp;
+                Log($"injected throwaway test employee {_testEmp.id} at '{store.BusinessName}' (in-memory only)");
+                return (store, _testEmp);
+            }
+            var b2 = ordered.First(x => x.Address.Equals(_testEmp.assignedAddress));
+            return (b2, _testEmp);
+        }
+
+        private void RemoveTestEmployee()
+        {
+            if (_testEmp == null) return;
+            EmployeeHelper.GetEmployeeInstances().Remove(_testEmp);
+            EmployeeHelper.EmployeeInstancesDictionary.Remove(_testEmp.id);
+            Log($"removed throwaway test employee {_testEmp.id}");
+            _testEmp = null;
         }
 
         private void ProbeReassignTask(out string? empId, out string? storeSig)
@@ -169,9 +196,26 @@ namespace StoreManagerProbe
             bool playerOwned = b.RentedByPlayer || b.BuildingOwnedByPlayer;
             Log($"target '{b.BusinessName}' playerOwned={playerOwned} emp={emp.id} " +
                 $"stations before = [{string.Join(",", emp.assignedWorkStationItems)}]");
+            // real reassignment: bind the employee to an assignable workstation in the building
+            string? stationId = null;
+            try
+            {
+                var stations = b.GetAssignableItems();   // List<ItemInstance> — the workstations
+                Log($"building has {stations.Count} assignable workstations: [{string.Join(",", stations.Take(6).Select(s => s.itemName))}]");
+                var st = stations.FirstOrDefault();
+                if (st != null) stationId = st.id;
+            }
+            catch (Exception ex) { Log("GetAssignableItems failed: " + ex.Message); }
+
+            if (stationId != null)
+            {
+                emp.assignedWorkStationItems.Clear();
+                emp.assignedWorkStationItems.Add(stationId);
+                Log($"set assignedWorkStationItems = [{stationId}]");
+            }
             emp.UpdateAssignedWorkStationItems();
             emp.UpdateWeeklyHoursAndDays();
-            Log($"emp {emp.id} stations after recompute = [{string.Join(",", emp.assignedWorkStationItems)}]");
+            Log($"emp {emp.id} stations after = [{string.Join(",", emp.assignedWorkStationItems)}]");
         }
 
         private void ProbeWriteShift()
@@ -221,6 +265,7 @@ namespace StoreManagerProbe
                 var e = EmployeeHelper.GetEmployeeById(empId, false);
                 Log($"recheck: emp {empId} stations = [{string.Join(",", e?.assignedWorkStationItems ?? new System.Collections.Generic.List<string>())}]");
             }
+            RemoveTestEmployee();
             // clean up the probe shift so we don't leave junk in the save
             if (_addedShiftDay != null && _addedShift != null)
             {

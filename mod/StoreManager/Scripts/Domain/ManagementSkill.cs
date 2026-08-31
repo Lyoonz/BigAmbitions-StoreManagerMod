@@ -24,13 +24,14 @@ namespace StoreManager.Domain
         /// Base probability that any given daily operation is botched, before difficulty scaling.
         /// skill 5 → 0.02, skill 3 → 0.12, skill 1 → 0.30. See MistakeModel for how it's applied.
         /// </summary>
+        // Tuned against sim/BalanceSim (Normal ~ skill1 12% / skill3 4% / skill5 1% of weekly revenue).
         public float BaseMistakeChance => Value switch
         {
-            5 => 0.02f,
-            4 => 0.06f,
-            3 => 0.12f,
-            2 => 0.20f,
-            _ => 0.30f,
+            5 => 0.015f,
+            4 => 0.035f,
+            3 => 0.070f,
+            2 => 0.120f,
+            _ => 0.190f,
         };
 
         /// <summary>
@@ -42,8 +43,8 @@ namespace StoreManager.Domain
             5 => 0.5f,
             4 => 0.7f,
             3 => 1.0f,
-            2 => 1.4f,
-            _ => 1.8f,
+            2 => 1.25f,
+            _ => 1.5f,
         };
 
         /// <summary>How many stores this manager can run well at once (Normal difficulty).</summary>

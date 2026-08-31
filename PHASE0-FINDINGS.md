@@ -10,13 +10,15 @@ auto-loaded a save and confirmed every read binding against live data — `Build
 `GetAvgDailyIncome`, `TimeHelper.CurrentDay/GetDayOfWeek` — with zero exceptions and zero save
 writes. See `probe/StoreManagerProbe/REPORT.md`.
 
-**Restock write-path CONFIRMED in-game:** the store's `SaveGameManager.Current.DeliveryContracts`
-entry — modifying `DeliveryContractItem.amount` recomputes `DeliveryContract.TotalPricePerDelivery`
-live. `GameBindings.PlaceRestockOrder` now uses this.
+**All write-paths CONFIRMED in-game** (via an in-memory throwaway employee — the save had 0 staff):
+- **Shift**: `ScheduleDay.AddWorkShift` persists — RECHECK 20s later showed the shift still there.
+- **Task assignment**: `EmployeeInstance.assignedWorkStationItems` is **derived** — a direct write
+  is wiped by `UpdateAssignedWorkStationItems()`. The real mechanism is a `WorkShift` whose
+  `itemInstanceId` is the station (`BuildingRegistration.GetAssignableItems()` lists them).
+  `GameBindings.AssignTask` was rewritten to do this.
+- **Restock**: `DeliveryContractItem.amount` write recomputes `TotalPricePerDelivery` live.
 
-**Still outstanding:** the task/shift write-path behavioural check needs a save with hired
-employees — the test save had `staffedBusinesses=0` across all 885 registrations. The APIs
-(`assignedWorkStationItems`, `ScheduleDay.AddWorkShift`) are the game's own.
+**Phase 0 is complete — GO with no caveats.**
 
 **Correction from Phase 0:** there is **no `ba:skill_storemanager`** game skill. The game's
 manager skills are `hrmanager` / `logisticsmanager` / `pricingmanager`. The mod's management

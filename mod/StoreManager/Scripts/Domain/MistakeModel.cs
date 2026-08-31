@@ -70,15 +70,16 @@ namespace StoreManager.Domain
             return result;
         }
 
+        // Per-mistake cost as a fraction of ONE day's revenue. Tuned via sim/BalanceSim.
         private static decimal BaseCostFor(MistakeKind kind, decimal dailyRevenue) => kind switch
         {
-            MistakeKind.UnderOrdered => dailyRevenue * 0.15m,   // lost sales
-            MistakeKind.OverOrdered => dailyRevenue * 0.10m,    // cash tied up / spoilage
-            MistakeKind.Understaffed => dailyRevenue * 0.12m,   // queues, walkouts
-            MistakeKind.Overstaffed => dailyRevenue * 0.05m,    // wasted wages
-            MistakeKind.UncoveredLeave => dailyRevenue * 0.20m,
-            MistakeKind.ComplaintUnresolved => dailyRevenue * 0.08m, // reputation drag
-            MistakeKind.TrainingMisspent => 250m,
+            MistakeKind.UnderOrdered => dailyRevenue * 0.07m,   // lost sales
+            MistakeKind.OverOrdered => dailyRevenue * 0.05m,    // cash tied up / spoilage
+            MistakeKind.Understaffed => dailyRevenue * 0.06m,   // queues, walkouts
+            MistakeKind.Overstaffed => dailyRevenue * 0.03m,    // wasted wages
+            MistakeKind.UncoveredLeave => dailyRevenue * 0.09m,
+            MistakeKind.ComplaintUnresolved => dailyRevenue * 0.04m, // reputation drag
+            MistakeKind.TrainingMisspent => 120m,
             _ => 0m,
         };
 

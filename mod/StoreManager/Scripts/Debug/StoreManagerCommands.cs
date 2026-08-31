@@ -57,9 +57,10 @@ namespace StoreManager.Debugging
             return reg;
         }
 
-        private static void Hire(string role, int skill)
+        /// <summary>Shared by the debug command and the options-menu button.</summary>
+        public static void Hire(string role, int skill)
         {
-            if (_directory == null) return;
+            if (_directory == null) { Debug.LogWarning("[StoreManager] Load a city first."); return; }
             var reg = CurrentStore();
             if (reg == null) return;
 
@@ -73,7 +74,7 @@ namespace StoreManager.Debugging
             Debug.Log($"[StoreManager] {emp.characterData?.name} is now {rank} of '{reg.BusinessName}' at skill {skill}.");
         }
 
-        private static void Status()
+        public static void Status()
         {
             if (_directory == null) return;
             if (_directory.Stores.Count == 0) { Debug.Log("[StoreManager] No managed stores."); return; }

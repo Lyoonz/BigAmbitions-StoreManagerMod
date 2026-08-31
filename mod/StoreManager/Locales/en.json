@@ -1,5 +1,8 @@
 {
   "storemanager_options_header": "Store Manager",
+  "storemanager_btn_hire_manager": "Hire Manager here (skill 4)",
+  "storemanager_btn_hire_assistant": "Hire Assistant here (skill 3)",
+  "storemanager_btn_status": "Log managed-store status",
   "storemanager_policy_staffing_label": "Staffing level",
   "storemanager_policy_staffing_lean": "Lean",
   "storemanager_policy_staffing_normal": "Normal",
