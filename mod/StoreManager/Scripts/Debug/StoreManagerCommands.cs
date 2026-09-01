@@ -1,10 +1,8 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using System.Linq;
-using Entities;
-using Helpers;
-using IngameDebugConsole;   // CommandHelper — the game's own console-command wrapper (ExternalPlugins.dll)
-using StoreManager.Domain;
+using IngameDebugConsole;   // CommandHelper (ExternalPlugins.dll)
 using StoreManager.Interop;
 using StoreManager.Runtime;
 using UnityEngine;
@@ -12,159 +10,156 @@ using UnityEngine;
 namespace StoreManager.Debugging
 {
     /// <summary>
-    /// In-game debug-console commands (open the console with the debug key). A stand-in for the
-    /// real hiring UI until Phase 1 builds one — lets a playtester assign a manager and drive
-    /// the daily loop. Registered by <see cref="Core.StoreManagerCityMod"/>.
+    /// In-game debug console commands — the power-user + test surface (both critiques kept these).
+    /// Open the console with backquote (needs the game launched with <c>-console</c>).
     /// </summary>
     public static class StoreManagerCommands
     {
-        private static ManagerDirectory? _directory;
-        private static IGameBindings? _game;
+        private static ManagerDirectory? _dir;
 
-        // keep delegate refs so RemoveCommand (delegate overload — the string overload is internal) can match
-        private static readonly Action<string, int> _hire = Hire;
+        private static readonly Action _managers = Managers;
+        private static readonly Action<int> _adopt = Adopt;
+        private static readonly Action _drop = Drop;
+        private static readonly Action _stores = Stores;
+        private static readonly Action<int> _assign = Assign;
+        private static readonly Action<int> _unassign = Unassign;
+        private static readonly Action<int, int> _setCap = SetCap;
+        private static readonly Action<int, int> _days = Days;
         private static readonly Action _status = Status;
-        private static readonly Action _runDay = RunDay;
-        private static readonly Action _runWeek = RunWeek;
-        private static readonly Action<int> _selfTest = SelfTest;
+        private static readonly Action _planWeek = PlanWeek;
 
-        public static void Register(ManagerDirectory directory, IGameBindings game)
+        public static void Register(ManagerDirectory dir)
         {
-            _directory = directory;
-            _game = game;
-            CommandHelper.AddCommand("StoreManager.Hire",
-                "Assign a leader to the store you're standing in. role = manager | assistant, skill 1-5.",
-                _hire, "role", "skill");
-            CommandHelper.AddCommand("StoreManager.Status", "List managed stores.", _status);
-            CommandHelper.AddCommand("StoreManager.RunDay", "Force the manager daily loop now.", _runDay);
-            CommandHelper.AddCommand("StoreManager.RunWeek", "Force the weekly digest now.", _runWeek);
-            CommandHelper.AddCommand("StoreManager.SelfTest",
-                "End-to-end: hire a skill-N manager here, run a full week of the real loop, log the digest, undo. Never saved.",
-                _selfTest, "skill");
+            _dir = dir;
+            CommandHelper.AddCommand("StoreManager.Managers", "List eligible Purchasing Agents at your HQ.", _managers);
+            CommandHelper.AddCommand("StoreManager.Adopt", "Adopt manager <n> from StoreManager.Managers.", _adopt, "n");
+            CommandHelper.AddCommand("StoreManager.Drop", "Drop the current Store Manager (restores contracts).", _drop);
+            CommandHelper.AddCommand("StoreManager.Stores", "List your supervisable stores.", _stores);
+            CommandHelper.AddCommand("StoreManager.Assign", "Assign store <n> from StoreManager.Stores.", _assign, "n");
+            CommandHelper.AddCommand("StoreManager.Unassign", "Unassign store <n>.", _unassign, "n");
+            CommandHelper.AddCommand("StoreManager.SetCap", "Set store <n> weekly restock budget to <amount>.", _setCap, "n", "amount");
+            CommandHelper.AddCommand("StoreManager.Days", "Set store <n> target days-of-stock to <days>.", _days, "n", "days");
+            CommandHelper.AddCommand("StoreManager.Status", "Print plan status.", _status);
+            CommandHelper.AddCommand("StoreManager.PlanWeek", "Force the weekly restock pass now (test).", _planWeek);
         }
 
         public static void Unregister()
         {
-            CommandHelper.RemoveCommand(_hire);
-            CommandHelper.RemoveCommand(_status);
-            CommandHelper.RemoveCommand(_runDay);
-            CommandHelper.RemoveCommand(_runWeek);
-            CommandHelper.RemoveCommand(_selfTest);
-            _directory = null;
-            _game = null;
+            foreach (var d in new Delegate[] { _managers, _adopt, _drop, _stores, _assign, _unassign, _setCap, _days, _status, _planWeek })
+                try { CommandHelper.RemoveCommand(d); } catch { }
+            _dir = null;
         }
 
-        /// <summary>
-        /// Runs the real runtime loop end-to-end against the live game and logs outcomes.
-        /// Injects a throwaway employee if the store has none; removes everything afterward.
-        /// Nothing is saved (the caller is expected not to save the game after running this).
-        /// </summary>
-        public static void SelfTest(int skill) => SelfTest(skill, useFirstStoreIfNotInOne: true);
+        // ── shared with the options panel ──────────────────────────────────────
+        public static void PrintStatus() => Status();
 
-        public static void SelfTest(int skill, bool useFirstStoreIfNotInOne)
+        // ── commands ──────────────────────────────────────────────────────────
+        private static string Hq() => GameApi.GetHeadquarters().FirstOrDefault().Address ?? "";
+
+        private static void Managers()
         {
-            if (_directory == null || _game == null) { Debug.LogWarning("[StoreManager] Load a city first."); return; }
-            var reg = CurrentStore();
-            if (reg == null && useFirstStoreIfNotInOne)
-            {
-                reg = SaveGameManager.Current.BuildingRegistrations.FirstOrDefault(r =>
-                    (r.RentedByPlayer || r.BuildingOwnedByPlayer) && r.scheduleDays != null && r.scheduleDays.Count > 0
-                    && r.businessTypeName != "ba:businesstype_empty");
-                if (reg != null) Debug.Log($"[StoreManager] SelfTest: not in a store — using '{reg.BusinessName}'.");
-            }
-            if (reg == null) return;
-
-            EmployeeInstance? throwaway = null;
-            var emp = EmployeeHelper.GetEmployeeInstances(new EmployeeInstancesQueryInfo { withAssignedAddress = reg.Address }).FirstOrDefault();
-            if (emp == null)
-            {
-                throwaway = EmployeeHelper.CreateAIEmployeeInstance("ba:skill_customerservice");
-                throwaway.characterData.name = "SELFTEST Worker";
-                throwaway.assignedAddress = reg.Address;
-                throwaway.hourlyWage = 18f;
-                EmployeeHelper.GetEmployeeInstances().Add(throwaway);
-                EmployeeHelper.EmployeeInstancesDictionary[throwaway.id] = throwaway;
-                emp = throwaway;
-                Debug.Log($"[StoreManager] SelfTest: injected throwaway employee {emp.id}");
-            }
-
-            var store = new GameRef(reg.Address.ToString(), reg.BusinessName, reg);
-            var empRef = new GameRef(emp.id, emp.characterData?.name ?? emp.id, emp);
-            var managed = _directory.AssignManager(store, empRef, new ManagementSkill(skill), ManagerRank.Manager);
-            Debug.Log($"[StoreManager] SelfTest: {emp.characterData?.name} = Manager of '{reg.BusinessName}' at skill {skill}. Running 7 days...");
-
-            for (int d = 1; d <= 7; d++)
-            {
-                try
-                {
-                    managed.RunDay();
-                    var w = managed.Data.CurrentWeek;
-                    Debug.Log($"[StoreManager] SelfTest day {d}: restockSpend={w.RestockSpend:C0} " +
-                              $"shifts={w.ShiftsCovered}/{w.ShiftsTotal} complaints={w.ComplaintsResolved}/{w.ComplaintsTotal} " +
-                              $"mistakes={w.MistakeCount} (cost {w.MistakeCost:C0})");
-                }
-                catch (Exception e) { Debug.LogError($"[StoreManager] SelfTest day {d} threw: {e}"); }
-            }
-
-            try
-            {
-                var report = managed.CloseWeek();
-                Debug.Log($"[StoreManager] SelfTest digest: '{report.StoreName}' revenue={report.Revenue:C0} ({report.RevenueDelta:C0}) " +
-                          $"restock={report.RestockSpend:C0} shifts={report.ShiftsCovered}/{report.ShiftsTotal} " +
-                          $"complaints={report.ComplaintsResolved}/{report.ComplaintsTotal} " +
-                          $"mistakes={report.MistakeCount} (cost {report.MistakeCost:C0}) " +
-                          $"attention=[{string.Join(" | ", report.AttentionItems)}]");
-            }
-            catch (Exception e) { Debug.LogError($"[StoreManager] SelfTest digest threw: {e}"); }
-
-            _directory.RemoveLeadership(store, ManagerRank.Manager);
-            if (throwaway != null)
-            {
-                EmployeeHelper.GetEmployeeInstances().Remove(throwaway);
-                EmployeeHelper.EmployeeInstancesDictionary.Remove(throwaway.id);
-            }
-            Debug.Log("[StoreManager] SelfTest: done, manager + throwaway employee removed. DO NOT SAVE this session.");
+            var hq = Hq();
+            if (string.IsNullOrEmpty(hq)) { Log("no HQ found — rent an office first"); return; }
+            var cands = GameApi.GetManagerCandidates(hq);
+            Log($"eligible managers at HQ ({cands.Count}):");
+            for (int i = 0; i < cands.Count; i++) Log($"  {i}: {cands[i]}");
+            if (cands.Count == 0) Log("  (recruit a Purchasing Agent, hire them, assign to the HQ, and schedule them)");
         }
 
-        private static BuildingRegistration? CurrentStore()
+        private static void Adopt(int n)
         {
-            var reg = BuildingManager.Instance?.buildingRegistration;
-            if (reg == null || !(reg.RentedByPlayer || reg.BuildingOwnedByPlayer))
+            if (_dir == null) return;
+            var hq = Hq();
+            var cands = GameApi.GetManagerCandidates(hq);
+            if (n < 0 || n >= cands.Count) { Log("bad index — run StoreManager.Managers"); return; }
+            Report(_dir.AdoptManager(hq, cands[n].Id));
+            StoreManager.UI.StoreManagerOptions.Rebuild();
+        }
+
+        private static void Drop()
+        {
+            if (_dir == null) return;
+            var plan = _dir.Plans.FirstOrDefault();
+            if (plan == null) { Log("no Store Manager to drop"); return; }
+            _dir.DropManager(plan.ManagerEmployeeId);
+            Log("dropped; delivery contracts restored");
+            StoreManager.UI.StoreManagerOptions.Rebuild();
+        }
+
+        private static void Stores()
+        {
+            if (_dir == null) return;
+            var stores = GameApi.GetSupervisableStores();
+            Log($"supervisable stores ({stores.Count}):");
+            for (int i = 0; i < stores.Count; i++)
             {
-                Debug.LogWarning("[StoreManager] Stand inside a business you own/rent first.");
-                return null;
+                var sup = _dir.PlanSupervising(stores[i].Address) != null ? "  [supervised]" : "";
+                var hasC = DeliveryContracts.HasContract(stores[i].Address) ? "" : "  (no delivery contract)";
+                Log($"  {i}: {stores[i].Name}{sup}{hasC}");
             }
-            return reg;
         }
 
-        /// <summary>Shared by the debug command and the options-menu button.</summary>
-        public static void Hire(string role, int skill)
+        private static string? StoreAddr(int n)
         {
-            if (_directory == null) { Debug.LogWarning("[StoreManager] Load a city first."); return; }
-            var reg = CurrentStore();
-            if (reg == null) return;
-
-            var emp = EmployeeHelper.GetEmployeeInstances(new EmployeeInstancesQueryInfo { withAssignedAddress = reg.Address }).FirstOrDefault();
-            if (emp == null) { Debug.LogWarning("[StoreManager] This store has no employees to promote. Hire one first."); return; }
-
-            var rank = role.ToLowerInvariant().StartsWith("assist") ? ManagerRank.AssistantManager : ManagerRank.Manager;
-            var store = new GameRef(reg.Address.ToString(), reg.BusinessName, reg);
-            var empRef = new GameRef(emp.id, emp.characterData?.name ?? emp.id, emp);
-            _directory.AssignManager(store, empRef, new ManagementSkill(skill), rank);
-            Debug.Log($"[StoreManager] {emp.characterData?.name} is now {rank} of '{reg.BusinessName}' at skill {skill}.");
+            var stores = GameApi.GetSupervisableStores();
+            if (n < 0 || n >= stores.Count) { Log("bad index — run StoreManager.Stores"); return null; }
+            return stores[n].Address;
         }
 
-        public static void Status()
+        private static string? MgrId() => _dir?.Plans.FirstOrDefault()?.ManagerEmployeeId;
+
+        private static void Assign(int n)
         {
-            if (_directory == null) return;
-            if (_directory.Stores.Count == 0) { Debug.Log("[StoreManager] No managed stores."); return; }
-            foreach (var s in _directory.Stores)
-                Debug.Log($"[StoreManager] '{s.Store.DisplayName}' mgr={s.Data.ManagerEmployeeId ?? "-"}({s.Data.ManagerSkill}) " +
-                          $"asst={s.Data.AssistantEmployeeId ?? "-"}({s.Data.AssistantSkill}) " +
-                          $"weekRevenue={s.Data.CurrentWeek.Revenue} attention={s.Data.CurrentWeek.AttentionItems.Count}");
+            var mgr = MgrId(); var addr = StoreAddr(n);
+            if (_dir == null || mgr == null || addr == null) { Log("adopt a manager first"); return; }
+            Report(_dir.AssignStore(mgr, addr));
         }
 
-        private static void RunDay() { _directory?.OnDayElapsed(); Debug.Log("[StoreManager] daily loop ran."); }
-        private static void RunWeek() { _directory?.OnWeekElapsed(); Debug.Log("[StoreManager] weekly digest ran."); }
+        private static void Unassign(int n)
+        {
+            var mgr = MgrId(); var addr = StoreAddr(n);
+            if (_dir == null || mgr == null || addr == null) return;
+            Report(_dir.UnassignStore(mgr, addr));
+        }
+
+        private static void SetCap(int n, int amount)
+        {
+            var mgr = MgrId(); var addr = StoreAddr(n);
+            if (_dir == null || mgr == null || addr == null) return;
+            Report(_dir.SetCap(mgr, addr, amount));
+        }
+
+        private static void Days(int n, int days)
+        {
+            var mgr = MgrId(); var addr = StoreAddr(n);
+            if (_dir == null || mgr == null || addr == null) return;
+            Report(_dir.SetTargetDays(mgr, addr, days));
+        }
+
+        private static void Status()
+        {
+            if (_dir == null) { Log("no city loaded"); return; }
+            if (_dir.Plans.Count == 0) { Log("no Store Manager adopted"); return; }
+            foreach (var p in _dir.Plans)
+            {
+                var m = GameApi.FindManager(p.ManagerEmployeeId);
+                Log($"MANAGER {m?.Name ?? p.ManagerEmployeeId}  hq={p.HqAddress}  dormant={p.Dormant}  " +
+                    $"stores={p.Assignments.Count}/{GameApi.MaxStores(p.HqAddress, p.ManagerEmployeeId)}  " +
+                    $"weekSpend=${p.Week.RestockSpend:N0}");
+                foreach (var a in p.Assignments)
+                    Log($"  - {a.StoreName}  cap=${a.WeeklyRestockBudgetCap:N0}  targetDays={a.TargetDaysOfStock}  " +
+                        $"spent=${a.SpentThisWeek:N0}  contract={(DeliveryContracts.HasContract(a.StoreAddress) ? "yes" : "MISSING")}");
+            }
+        }
+
+        private static void PlanWeek()
+        {
+            if (_dir == null) return;
+            _dir.RunWeeklyPlanning();
+            Log("weekly restock pass ran — see toasts + the phone thread");
+        }
+
+        private static void Report(ActionResult r) => Log((r.Ok ? "" : "blocked: ") + r.Message);
+        private static void Log(string s) => Debug.Log("[StoreManager] " + s);
     }
 }

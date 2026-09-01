@@ -7,6 +7,13 @@ station automatically when a scheduled employee clocks in.
 
 Full design: see the design brief and the Phase 0 runbook (links in `DECISIONS.md`).
 
+> **v2 in progress.** The manager is being rebuilt as a real hired employee
+> (`ba:skill_purchasingagent`) recruited/scheduled through the vanilla UI, with a mod
+> supervision plan (assign N stores, per-store limits, weekly delivery-contract restock,
+> visible feedback). Phase 1 is coded and compiles clean against the game; see
+> [`CONTINUE.md`](CONTINUE.md) and [`docs/DESIGN-v2.md`](docs/DESIGN-v2.md). The status
+> table below describes the earlier v1.
+
 ## Status
 
 | Part | State |

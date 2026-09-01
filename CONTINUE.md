@@ -13,12 +13,33 @@ StuartArmour, Lyoon). Not related to any other repo.
 
 | Thing | Status |
 |-------|--------|
-| **v1** — off-screen data role, hire via console/options button, daily loop, restock via DeliveryContract | ✅ **built, runs in the real game, verified end-to-end** (see `probe/StoreManagerProbe/REPORT.md`). The user rejected the UX (invisible, not "via the office"). |
-| **v2 design** — manager = real hired employee, mod supervision plan, weekly Monday restock, ModOptions panel, `modData` persistence | ✅ **researched (multi-agent workflow), verified in-game (reflection dump), decisions locked D9–D13** — `docs/DESIGN-v2.md` |
-| **v2 build** | ⛔ **not started.** This is the next job. |
+| **v1** — off-screen data role (git history ≤ commit `e3c47b8`) | superseded by v2 |
+| **v2 design** — `docs/DESIGN-v2.md`, decisions D9–D13 | ✅ locked |
+| **v2 Phase 1** — real hired manager (`ba:skill_purchasingagent`), mod supervision plan in `GameInstance.modData`, assign N stores + per-store limits (console + ModOptions panel), weekly (Saturday) delivery-contract restock within budget, toasts + phone digest, reconcile-on-fire | ✅ **coded, compiles clean (0/0) against the real game (Build 3672)** — NOT yet run in-game |
+| **v2 Phase 2** — multi-store hardening, per-store limits UI polish, optional BizMan HQ-tab spike | ⛔ next |
 
-The code on disk (`mod/StoreManager/Scripts/`) is still **v1**. `docs/DESIGN-v2.md` §"Phased plan"
-lists the file-by-file Phase 1 rewrite.
+The game **auto-updated Build 3670 → 3672** mid-build. The `dotnet build build/CompileCheck.csproj`
+check compiles against the live DLLs, so it's the source of truth; the decompile in
+`docs/research/reflection-dump-*.txt` is Build 3672 but the prose research files predate it —
+re-verify any exact signature the compiler flags.
+
+### v2 Phase 1 file map (all under `mod/StoreManager/Scripts/`)
+```
+Core/StoreManagerMod.cs      Init entry (options panel) + City entry (directory, event wiring, StoreManagerCityMod.Active)
+Domain/StoreManagerPlan.cs   StoreManagerPlan, StoreAssignment, ContractSnapshot, GlobalDefaults, WeekTally, StaffingLevel
+Interop/GameApi.cs           the ONE game seam — HQ/store/manager reads, modData r/w, ChangeMoney, event sub/unsub
+Interop/DeliveryContracts.cs get/snapshot/restore/disable a store's DeliveryContract; PlanAndApply (the weekly tune)
+Interop/Feedback.cs          Notifications.Show toasts + Contact/TextMessage phone thread
+Interop/Serialization.cs     OdinSerializer JSON envelope of List<StoreManagerPlan>
+Interop/ModDataStore.cs      persistentDataPath fallback sink (save-scoped key)
+Runtime/ManagerDirectory.cs  owns the plans: Adopt/Drop/Assign/Unassign/SetCap, Reconcile, weekly tick
+Runtime/WeeklyRestockPlanner.cs   per-plan weekly pass over assignments
+Runtime/WeeklyDigest.cs      compose + send the weekly report
+UI/StoreManagerOptions.cs    Options→Mods panel (built-in controls only; store assignment is console in v1)
+Debug/StoreManagerCommands.cs  StoreManager.Managers/.Adopt/.Stores/.Assign/.Unassign/.SetCap/.Days/.Status/.PlanWeek
+```
+v1's `MistakeModel`/`ManagementSkill`/`DifficultyProfile`/`ManagerRank`/`PlayerScheduling`/`sim/`
+were deleted (recoverable from git ≤ `e3c47b8`); Phase 3 re-introduces "manager imperfection".
 
 ## Artifacts (claude.ai — accessible from any machine)
 
@@ -110,14 +131,24 @@ dotnet build build/CompileCheck.csproj    # 0 warnings / 0 errors == type-safe a
 
 ## The immediate next task
 
-Execute **Phase 1** of `docs/DESIGN-v2.md`. Order:
-1. `Interop/GameBindings.cs` seam rewrite (HQ discovery, schedule gate, modData, dual-binding guard)
-2. `Domain/StoreManagerPlan.cs` + `StoreAssignment.cs` (replace `StoreManagerData.cs`)
-3. `Interop/DeliveryContracts.cs` + `Interop/Feedback.cs`
-4. `Runtime/ManagerDirectory.cs` + `ManagedPlan.cs` + `DailyOperations.Restock` (weekly)
-5. `UI/StoreManagerPanel.cs` (ModOption.SpawnUi) + console commands
-6. `Core/StoreManagerMod.cs` wiring; locales
-7. In-game test the full flow; resolve the 4 open verifications in `docs/DESIGN-v2.md`
-   §"Still to verify in-game".
+**Test v2 Phase 1 in-game**, then start Phase 2.
+
+### In-game test (needs a save with an HQ + retail stores + a delivery contract)
+1. `bash build/deploy-local.sh` ; launch with `-console -windowed` ; load the save.
+2. Recruit a **Purchasing Agent** from the Recruitment Agency → hire → assign to the HQ →
+   schedule them on an HQ desk (BizMan → HQ → Schedule).
+3. Console: `StoreManager.Managers` → `StoreManager.Adopt 0` → `StoreManager.Stores` →
+   `StoreManager.Assign 0` → `StoreManager.SetCap 0 8000` → `StoreManager.Status` →
+   `StoreManager.PlanWeek`.
+4. Confirm from `Player.log` + in-game: the store's `DeliveryContract` got `enabled=true` +
+   item amounts tuned within cap; a toast fired; the "Store Manager" phone contact got a
+   weekly report; `modData` survives save/reload; firing the manager restores the contract.
+5. Fill in `docs/DESIGN-v2.md` §"Still to verify in-game" items 1–4 with what you observe.
+
+### Phase 2 (after the test passes)
+- Multi-store: assign 2+ stores to one manager, confirm per-store budget accounting is independent.
+- Per-store limits UI: a `ModOption.SpawnUi` store-picker panel (currently console-only).
+- Optional: the BizMan HQ "Store Managers" tab — **research spike only, not committed** (both
+  critiques rate it highest-risk/lowest-value; needs Harmony on private `BizManBusiness` members).
 
 Keep `dotnet build build/CompileCheck.csproj` green after every file.
