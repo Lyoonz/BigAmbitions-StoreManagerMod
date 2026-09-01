@@ -1,0 +1,299 @@
+{
+ "summary": "The \"Store Manager\" becomes a real Entities.EmployeeInstance recruited through the vanilla recruitment flow on the existing ba:skill_logisticsmanager skill (so it appears in My Employees, draws a wage, and is rostered by the vanilla BizMan > HQ > Schedule tab with zero patching), plus a mod-owned \"plan\" object that mirrors HrManagerPlan/LogisticsManagerPlanDestination: it holds the manager id, the HQ address, a skill-scaled list of supervised store addresses and a per-store limits record. The plan is persisted in GameInstance.modData, driven from GlobalEvents.onNewDay, and keeps each supervised store stocked by editing that store's real Entities.DeliveryContract. Every action produces visible feedback (UI.Notification.Notifications.Show + a permanent Entities.Contact phone thread). v1 hire/assign/limits UI is a custom ModOption.SpawnUi panel + console commands; v2 adds a Harmony-injected \"Store Managers\" tab on the HQ BizMan panel for the \"manage it in the office\" feel. A genuine new GameInstance plan type and a genuine new skill are both rejected as infeasible/fragile against the game's two serializers and unguarded SkillHelper.GetData call sites.",
+ "coreDecision": "Choose B — a parallel mod-owned plan that mimics the HQ manager-plan pattern — while reusing the REAL ba:skill_logisticsmanager game skill for the manager employee. Rationale: (1) Option C (Harmony-inject a real StoreManagerPlan into GameInstance.hrManagerPlans-style lists) is infeasible cleanly — GameInstance has hard-typed List<T> plan fields, is serialized by BOTH Newtonsoft (TypeNameHandling.Auto) and OdinSerializer binary with a custom policy, and the Player.SaveSystem.CompatibilityFixes.* passes actively delete plan/employee refs they cannot resolve, so an injected type risks corrupting vanilla saves. (2) Option A (piggyback a real LogisticsManagerPlan) breaks on substance: LogisticsManagerPlan restocks a store FROM a player-owned Warehouse via DistributedWork/vehicle sim, not via DeliveryContract, needs the player to own a warehouse, and its entries live in a GameInstance list the mod cannot safely grow; the vanilla Hour==2 tick would also run it with vanilla semantics. (3) Option B keeps all mod state in mod-owned data yet still satisfies requirements 3 and 4 natively because reusing ba:skill_logisticsmanager means RecruitmentHelper.GenerateCandidate builds the right typed subclass, EmployeeHelper.HireCandidate runs the full hire flow, an HQ desk workstation for that skill already exists, and EmployeeInstance.IsAssignedToAnyWorkShift() is the ready-made scheduling gate. Fallback: if reusing ba:skill_logisticsmanager causes UX bleed (the employee also shows as an assignable candidate in the vanilla LogisticsManagers HQ tab), switch v1 to ba:skill_hrmanager (same properties, less overlap with store restocking); the deeper fallback is a registered custom storemanager:skill_manager via SkillHelper.OnSkillDataLoaded re-injected each city load, gated behind a Harmony null-guard on SkillHelper.GetData (Phase 3).",
+ "requirementMap": [
+  {
+   "requirement": "1. Everything the mod does has visible in-game feedback (notifications, phone messages, UI panels) — no silent state",
+   "mechanism": "GAME: UI.Notification.Notifications.Show(NotificationType, headerKey, Dictionary<string,string>, secs, dupId, onClickAction, sound, track) for per-action toasts with a deep-link onClick; Entities.Contact.EnsurePermanentContact(\"storemanager_alerts\", ContactCategoryName.Business, \"employee_contact_description\") + contact.SendMessage(new Entities.TextMessage(msgKey, data)) for the phone thread; TransactionInfo(\"storemanager:transaction_*\") line items on every GameManager.ChangeMoneySafe. onClick calls InstanceBehavior<UIs>.Instance.fullMenu.bizMan.Open(hqAddress, tab). MOD: new Interop/Feedback.cs wraps both; Runtime/WeeklyDigest.Send extended; Runtime/DailyOperations raises a toast per restock/schedule/limit-hit event; Runtime/ManagerDirectory raises toasts on assign/detach/manager-fired. Locales/en.json + nl.json get the new keys (folder already wired via ModDiscoveryRegistry.SyncDiscoveredLocalizationPaths). UI: toasts + Contacts app thread, plus the config panel itself.",
+   "v1": "Full: toasts for every manager action, a weekly Contact digest, finance line items, and a config panel that always reflects live plan state. onClick deep-links to the vanilla Schedule tab (our own tab does not exist until v2).",
+   "deferred": "Custom contact icon (no ModAPI hook — falls back to the generic employee icon); prefab-perfect in-panel status bars (v1 panel is functional uGUI, not art-matched)."
+  },
+  {
+   "requirement": "2. You HIRE the Store Manager THROUGH THE OFFICE / HEADQUARTERS, like the HR / Logistics / Pricing Manager plan pattern",
+   "mechanism": "GAME (v2, needs Harmony): postfix BizManBusiness.SetUpTabs to add tab id \"StoreManagers\" to the private _tabs list when buildingRegistration.businessTypeName == \"ba:businesstype_headquarters\" && RentedByPlayer; patch BizManBusiness.SetTab to instantiate/activate a mod container under the `containers` transform; patch BizManBusiness.Awake/OnEnable to build the tab menu button + container GameObjects. The candidate itself comes from the vanilla recruitment flow (Recruitment Agency dialog / Headhunters tab picking the Logistics Manager skill) or from a mod \"Recruit\" button calling Helpers.RecruitmentHelper.GenerateCandidate(\"ba:skill_logisticsmanager\", skillValue, hqAddress, demands). MOD: new UI/BizManStoreManagerTab.cs (runtime-built uGUI: plan list + add-plan + manager dropdown + supervised-store list, mirroring HrManagersPlanList/LogisticsManagerDestinationUI); new Interop/Patches/BizManBusinessPatches.cs (Harmony, 0Harmony.dll bundled in Dependencies/ per D2); new Interop/Recruiting.cs.",
+   "v1": "Honest v1: NOT in the office. Hire/assign/configure is a custom ModOption.SpawnUi panel (Options > Mods tab, reachable in-game via pause menu) titled per-HQ, plus console commands (StoreManager.Recruit / .Assign). The panel enforces the same preconditions the vanilla HR tab does (must own an established Headquarters; manager must be an HQ-assigned, scheduled ba:skill_logisticsmanager employee).",
+   "deferred": "The real BizMan \"Store Managers\" HQ tab (v2). Byte-perfect visual parity with vanilla manager tabs and reuse of the vanilla NoManagerAssignedPopUp / ReorderableList prefabs (v3, would need an AssetBundle)."
+  },
+  {
+   "requirement": "3. The hired manager appears in \"My Employees\" and behaves like any normal hired employee (same hire flow, salary)",
+   "mechanism": "GAME: Helpers.EmployeeHelper.HireCandidate(candidate) — full vanilla hire (removes from CandidateEmployeeInstances, adds to EmployeeInstances, sets dayHired, todo, GameEvent \"ba:gameevent_employeehired\", app badge). Because the manager is a plain Entities.EmployeeInstance carrying ba:skill_logisticsmanager (RecruitmentHelper.GenerateCandidate returns the LogisticsManager subclass), it is automatically a normal My Employees row paid by EmployeeHelper.PayDailyWages. MOD: Interop/Recruiting.cs (thin wrapper over GenerateCandidate + HireCandidate for the panel/console); nothing else — the mod does NOT subclass EmployeeInstance (would dangle $type in the save if uninstalled).",
+   "v1": "Full and native. No mod-owned employee state on the employee object itself.",
+   "deferred": "Nothing. (A custom job-title label \"Store Manager\" instead of \"Logistics Manager\" is deferred to the Phase 3 custom-skill option.)"
+  },
+  {
+   "requirement": "4. You SCHEDULE the manager (inroosteren) like any employee",
+   "mechanism": "GAME: vanilla BizMan > HQ > Schedule tab. The manager needs assignedAddress == HQ and a WorkShift on an office-desk workstation whose suitableSkills contains ba:skill_logisticsmanager — that item already exists at the HQ (vanilla Logistics Managers use it). Buildings.Schedule.ScheduleAutoFiller / reg.scheduleDays[d].AddWorkShift for the supervised STORES' rosters (D5). MOD: Runtime/ManagedPlan gates all activity on Interop/GameBindings.IsScheduledAtHq(managerId) => EmployeeInstance.IsAssignedToAnyWorkShift() at the HQ address, mirroring HrManagersPlanList.UpdateHrManagerDropdownForPlan's candidate filter; Runtime/ManagerDirectory reconcile also mirrors ScheduleHelper.UpdateHQPlans (unschedule => plan goes dormant).",
+   "v1": "Full: the player rosters the manager with the vanilla tool; the plan simply will not act until the manager holds an HQ shift, and auto-detaches (dormant + notification) when the shift is removed.",
+   "deferred": "A Harmony postfix on ScheduleHelper.UpdateHQPlans for frame-exact detach parity (Phase 3, optional — the per-tick reconcile already covers it)."
+  },
+  {
+   "requirement": "5. Once scheduled, you ASSIGN the manager to N stores (multi-store supervision, like GetSupervisedStores)",
+   "mechanism": "GAME: iterate SaveGameManager.Current.BuildingRegistrations where RentedByPlayer && retail/revenue business && not already supervised by another mod plan (same shape as PricingManagerPlan.GetSupervisedStores / LogisticsManagerPlan.destinations). Cap derived from the manager's skill like HrManagerHelper.CalculateMaxAssignableEmployees / LogisticsManagerPlan.CalculateMaxDestinations. MOD: Domain/StoreManagerPlan.SupervisedStores : List<StoreAssignment>; Domain/StoreManagerPlan.MaxStores => 1 + floor(GetSkillValue(\"ba:skill_logisticsmanager\")/25); Runtime/ManagerDirectory.AssignStore/UnassignStore enforce the cap; Runtime/DailyOperations loops the assignments each day. UI: v1 checkbox list in the SpawnUi panel + StoreManager.Assign <storeId> console; v2 the destination-list section of the BizMan tab.",
+   "v1": "Full mechanically (assignment list + skill-scaled cap + per-day fan-out). UI is the custom panel/console, not the office tab.",
+   "deferred": "Drag-reorder priority among stores (vanilla LogisticsManager has a ReorderableList so only the first MaxDestinations are active) — v1 just rejects assignments over the cap."
+  },
+  {
+   "requirement": "6. Per assigned store you SET LIMITS (restock budget cap, staffing level, etc.)",
+   "mechanism": "GAME: none directly — pure mod data, enforced in the mod's onNewDay logic and against GameManager.ChangeMoneySafe / DeliveryContract totals. MOD: Domain/StoreAssignment { Address Store; decimal WeeklyRestockBudgetCap; StaffingLevel Staffing; PricePolicy Pricing; ... } — this is today's Domain/StorePolicy fields moved from one global instance to one per assignment; Domain/StorePolicy kept as the per-assignment value type + the global defaults. Runtime/DailyOperations.Restock stops ordering when CurrentWeek.RestockSpend >= assignment.WeeklyRestockBudgetCap and raises a \"budget cap hit\" toast. UI: per-store cap slider + staffing dropdown in the SpawnUi panel (v1) / BizMan tab (v2); StoreManager.SetCap <storeId> <amount> console.",
+   "v1": "Full: restock budget cap + staffing level per store, plus global defaults applied to new assignments.",
+   "deferred": "Price policy actually writing retail prices (needs the PricingManagerPlan.ApplyManualPrice path — Phase 3); training budget actually driving TrainingInstance (Phase 3)."
+  },
+  {
+   "requirement": "7. The manager keeps assigned stores STOCKED VIA DELIVERY (manages the store's DeliveryContract) plus day-to-day",
+   "mechanism": "GAME: SaveGameManager.Current.DeliveryContracts (List<Entities.DeliveryContract>); find/create the contract with businessAddress == store; set enabled = true, repeatingOrder = true, pick wholesaleAddress, and tune items[].DeliveryContractItem.amount so projected stock covers demand to the per-product target (algorithm copied from LogisticsManagerPlanDestination.ProcessStockTarget: target - BuildingHelper.CountTotalResourcesInStock); respect Helpers.DeliveryHelper.CanModifyContract(day); the contract itself bills the player. Day-to-day: reg.scheduleDays roster top-up via ScheduleAutoFiller, complaint handling via AI.Employees.ComplaintHelper. MOD: new Interop/DeliveryContracts.cs (contract CRUD wrapper); Runtime/DailyOperations.Restock rewritten to drive the repeating contract instead of one-off orders / ReStockingHelper shelf redistribution; on plan detach, Runtime/ManagerDirectory restores each contract to the enabled/repeatingOrder/items snapshot captured at assign time (mirrors PricingManagerPlan.originalStorePrices). Driven from GlobalEvents.onNewDay.",
+   "v1": "Full for the delivery loop (create/adjust/disable the repeating DeliveryContract within the budget cap, restore on detach) and roster top-up + complaint handling. Runs from onNewDay.",
+   "deferred": "Warehouse-sourced restock (vanilla LogisticsManager style) — not in scope; contract-only. Fine-grained per-product targets in the UI (v1 auto-derives targets from recent sales; explicit per-item sliders are v2/v3)."
+  }
+ ],
+ "harmonyNeeded": [
+  "BizManBusiness.SetUpTabs — postfix to add tab id \"StoreManagers\" into the private _tabs list for ba:businesstype_headquarters + RentedByPlayer (Phase 2)",
+  "BizManBusiness.SetTab — prefix/postfix to instantiate and activate the mod's tab container under the `containers` transform when tabName == \"StoreManagers\", and skip the vanilla menu.Find/switch (Phase 2)",
+  "BizManBusiness.Awake (or OnEnable) — postfix to build the tab menu button under `menu` and an empty container under `containers`, both named \"StoreManagers\", so SetTab's name-based Find succeeds (Phase 2)",
+  "SkillHelper.GetData — postfix/finalizer null-guard returning a safe default SkillData so unguarded `.baseHourlyWage` / `.trainingCostMultiplier` / `.secondarySkill` / `.icon28` / `.associatedColorGradient` call sites do not NPE (Phase 3 — ONLY if adopting a registered custom storemanager:skill_manager; not needed while reusing ba:skill_logisticsmanager)",
+  "ScheduleHelper.UpdateHQPlans — postfix to mark the mod plan dormant when the manager loses their last HQ WorkShift, for frame-exact parity with vanilla manager plans (Phase 3, optional — per-tick reconcile already covers this)"
+ ],
+ "assetBundleNeeded": [
+  "Phase 1 + Phase 2: NONE — the config panel (ModOption.SpawnUi) and the v2 BizMan tab are built at runtime with uGUI/TextMeshPro parented under existing game canvases (AssetService.RemapShaders not needed for code-built UI).",
+  "Phase 3 (optional, for prefab-perfect native look): a \"StoreManagerTab\" uGUI prefab (plan list + detail panel styled to match the vanilla HR/Logistics manager tabs) shipped via IModBigAmbitions.RelativeAssetBundlePaths + AssetService.Spawn + RemapShaders.",
+  "Phase 3 (optional, only if adopting a custom skill): a SkillData .asset + 28px icon Sprite + associatedColorGradient, authored in a Unity project on the game's exact Unity version, loaded from a mod bundle and handed to SkillHelper.OnSkillDataLoaded."
+ ],
+ "persistence": "Primary sink: GameInstance.modData (public Dictionary<string,string> on the save root, confirmed unused by the base game, round-trips both the Newtonsoft TypeNameHandling.Auto path and the OdinSerializer binary path). Key \\\"StoreManager.plans.v1\\\" -> an OdinSerializer JSON blob of List<Domain.StoreManagerPlan>. Each plan is keyed by the manager's Entities.EmployeeInstance.id plus the HQ Address string, and carries: ManagerEmployeeId, HqAddress, List<StoreAssignment> (each with the store Address, WeeklyRestockBudgetCap, StaffingLevel, PricePolicy, and a captured pre-manager DeliveryContract snapshot for restore-on-detach), WeekTally accumulators, MistakeSeed, and a Dormant flag + grace-day counter. Write on GlobalEvents.onSaveGame (fires before serialize in SaveGameManager.Save); read on [ModEntryOnCityLoad] from SaveGameManager.Current.modData. Interop/Serialization.cs keeps using OdinSerializer; only the sink moves from the persistentDataPath file to modData. Fallback sink: Interop/ModDataStore.cs JSON file under Application.persistentDataPath/Mods/StoreManager, keyed by save identity — used only if a modData read returns empty on a save the mod believes had a plan (guards against an Odin binary round-trip failure on a large string; flagged as an open question). Reload survival: on city load, each plan is revived only if EmployeeHelper.GetEmployeeById(ManagerEmployeeId) resolves; unresolved plans are dropped and their DeliveryContract snapshots restored. In-game firing sync: subscribe GlobalEvents.onJobChange AND reconcile every onNewDay — if the manager employee is gone (fired/quit/poached) or !IsAssignedToAnyWorkShift() at the HQ, set Dormant, fire a toast + phone message, hold the record for a 3-day grace window (in case of re-hire/re-schedule), then delete it and restore every supervised store's DeliveryContract to its captured snapshot. OnUnloadAsync flushes then clears in-memory state so an uninstall is clean (the modData entry is left in place, harmless, and re-adopted if the mod is reinstalled).",
+ "decisionAmendments": [
+  "D3: 'A hired manager is a data role attached to a business/building; no character model' -> 'The manager is a real Entities.EmployeeInstance recruited through the vanilla recruitment flow on ba:skill_logisticsmanager, hired via EmployeeHelper.HireCandidate, appearing in My Employees with a real wage and a player-set schedule. The mod adds only the supervision plan on top and never subclasses EmployeeInstance. Still no bespoke NPC body / pathfinding / floor presence.'",
+  "D4: 'Digest -> smartphone messages; policy knobs -> a global ModOptions panel; a bespoke native window is deferred; open question whether ModOptions can be per-store' -> 'Weekly digest via Entities.Contact/TextMessage AND a per-action UI.Notification.Notifications.Show toast with a deep-link onClick. Hire/assign/per-store-limits UI ships in v1 as a custom ModOption.SpawnUi panel that IS per-store (not global-only); global ModOptions keeps only default values for new assignments. v2 adds a Harmony-injected \"Store Managers\" tab on the HQ BizMan panel.'",
+  "D5: add 'The manager is rostered by the player through the vanilla BizMan > HQ > Schedule tab. The mod plan is gated on EmployeeInstance.IsAssignedToAnyWorkShift() at the HQ (mirrors HrManagersPlanList's candidate filter) and goes dormant when the manager is unscheduled (mirrors ScheduleHelper.UpdateHQPlans). ScheduleAutoFiller is still used for the SUPERVISED STORES rosters, not the manager.'",
+  "D6: 'Persist a per-store StoreManagerData record keyed by mod id + store id, written into the game save' + Phase-0 revision 'JSON file under persistentDataPath keyed by save name' -> 'Persist a plan-centric List<StoreManagerPlan> (keyed by manager EmployeeInstance.id + HQ Address) into GameInstance.modData[\"StoreManager.plans.v1\"], flushed on GlobalEvents.onSaveGame, loaded on [ModEntryOnCityLoad]. The persistentDataPath JSON file is demoted to a fallback sink. Live-fire sync via GlobalEvents.onJobChange + per-tick reconcile against EmployeeHelper.GetEmployeeById, with a 3-day grace window and DeliveryContract restore-on-detach.'",
+  "D7: unchanged — no departments / Team Leaders in v1 or v2. (Note: because a mod plan has exactly ONE manager like every vanilla HQ plan, the Domain/ManagerRank ladder collapses to a single Manager role in v1.)",
+  "D2: unchanged in intent, now definitely exercised in Phase 2 — bundled 0Harmony.dll in Dependencies/, patch targets are BizManBusiness.SetUpTabs / SetTab / Awake. Phase 1 ships with zero Harmony.",
+  "NEW D9 (core architecture): Build a parallel mod-owned plan (Option B) that mimics HrManagerPlan/LogisticsManagerPlanDestination, reusing the real ba:skill_logisticsmanager skill for the manager employee. Reject Option A (piggyback a real LogisticsManagerPlan — wrong restock source, un-growable GameInstance list) and Option C (Harmony-inject a real plan type into GameInstance — infeasible against Newtonsoft + OdinSerializer + CompatibilityFixes purge passes). Fallback: ba:skill_hrmanager if the logistics-skill UX bleed is bad.",
+  "NEW D10 (manager skill): v1 reuses ba:skill_logisticsmanager (zero NPE risk; native subclass, wage curve, HQ desk, scheduler all work). A registered custom storemanager:skill_manager via SkillHelper.OnSkillDataLoaded (re-injected every city load) is a Phase 3 option, contingent on verifying the ~8 unguarded SkillHelper.GetData(name).<field> call sites in a running game, with a Harmony null-guard on SkillHelper.GetData as the safety net."
+ ],
+ "phases": [
+  {
+   "phase": "Phase 1 — make it real, visible, hireable (no Harmony, no bundle, pure ModAPI)",
+   "goal": "A ba:skill_logisticsmanager employee, hired through the normal flow and rostered at the HQ, can be designated Store Manager and assigned to one store; from onNewDay it keeps that store stocked via the store's DeliveryContract within a budget cap; every action is a toast + a weekly phone digest; all state survives save/reload in GameInstance.modData and reconciles when the employee is fired.",
+   "tasks": [
+    "Interop/GameBindings.cs — rewrite the seam: add GetHeadquarters() (BuildingRegistrations where businessTypeName==\"ba:businesstype_headquarters\" && RentedByPlayer), IsScheduledAtHq(empId) => EmployeeInstance.IsAssignedToAnyWorkShift(), GetLogisticsManagerCandidatesAtHq(), ReadModData(key)/WriteModData(key,json) against SaveGameManager.Current.modData with the ModDataStore file as fallback. Fill in the CONFIRMED-pattern stubs (SendManagerMessage, ChangeMoney already done).",
+    "Interop/Feedback.cs — NEW: Notify(NotificationType, key, data, onClickTab) wrapping UI.Notification.Notifications.Show with an onClick that calls InstanceBehavior<UIs>.Instance.fullMenu.bizMan.Open(hqAddress, tab); Thread(key, data) wrapping Contact.EnsurePermanentContact(\"storemanager_alerts\", ContactCategoryName.Business, \"employee_contact_description\").SendMessage(new TextMessage(...)).",
+    "Interop/DeliveryContracts.cs — NEW: GetOrCreateContract(storeAddress), SetTargets(contract, Dictionary<item,target>) using the LogisticsManagerPlanDestination.ProcessStockTarget algorithm, Enable/Disable, Snapshot/Restore, all guarded by DeliveryHelper.CanModifyContract(day).",
+    "Interop/Recruiting.cs — NEW: SpawnCandidate(skillValue) => RecruitmentHelper.GenerateCandidate(\"ba:skill_logisticsmanager\", ...); Hire(candidate) => EmployeeHelper.HireCandidate + set assignedAddress = HQ.",
+    "Domain/StoreManagerPlan.cs + Domain/StoreAssignment.cs — NEW (StoreManagerPlan replaces per-store StoreManagerData): ManagerEmployeeId, HqAddress, List<StoreAssignment>, WeekTally, MistakeSeed, Dormant/GraceDays. MaxStores => 1 + floor(skill/25).",
+    "Domain/StoreManagerData.cs — delete after moving WeekTally into StoreManagerPlan.cs. Domain/ManagerRank.cs — rewrite down to a single Manager role + the wage helper. Domain/ManagementSkill.cs — re-base on the live 0–100 GetSkillValue, keep the 1–5 mapping only for MistakeModel tuning.",
+    "Interop/Serialization.cs — retarget the Envelope to List<StoreManagerPlan>; keep OdinSerializer JSON.",
+    "Runtime/ManagerDirectory.cs — rewrite: registry keyed by manager EmployeeInstance.id; Load() from modData; Reconcile() against EmployeeHelper.GetEmployeeById + IsScheduledAtHq each tick; subscribe GlobalEvents.onJobChange; Assign/UnassignStore with cap enforcement; restore-on-detach.",
+    "Runtime/ManagedStore.cs -> Runtime/ManagedPlan.cs — rewrite: one manager, N assignments; RunDay loops assignments; gate on manager present + scheduled.",
+    "Runtime/DailyOperations.cs — rewrite Restock() to drive the repeating DeliveryContract via Interop/DeliveryContracts within assignment.WeeklyRestockBudgetCap; keep Schedule()/Complaints()/Leave() shape (Schedule still calls ScheduleAutoFiller for the store roster).",
+    "Runtime/WeeklyDigest.cs — extend Send() to also raise a Feedback.Notify summary toast.",
+    "Core/StoreManagerMod.cs — wire GlobalEvents.onNewDay/onNewHour/onSaveGame/onJobChange; flush modData on save and unload; HQ discovery on city load.",
+    "UI/PolicyOptions.cs — rewrite to global DEFAULTS only (staffing, restock cap, pricing) that seed new StoreAssignments.",
+    "Debug/StoreManagerCommands.cs — update: StoreManager.Recruit <skill>, .Assign <storeId>, .Unassign <storeId>, .SetCap <storeId> <amount>, .Status, .RunDay, .RunWeek, .SelfTest.",
+    "Locales/en.json + nl.json — add notification/message/transaction keys.",
+    "Manual in-game test: recruit, hire, schedule at HQ, StoreManager.Assign, StoreManager.RunDay x7, confirm DeliveryContract edits + toasts + digest, save/reload, fire the manager, confirm reconcile + contract restore."
+   ],
+   "riskyItem": "Runtime/DailyOperations.Restock driving Entities.DeliveryContract from an onNewDay handler: unverified whether DeliveryHelper.CanModifyContract's window is open at that point in the tick, whether creating a contract from scratch (choosing wholesaleAddress) is safe, and whether the mod's edits survive the game's own BusinessHelper.HandleWholesaleDeliveries pass on the same day. Mitigate by testing against an existing player contract first and only creating new ones once the edit path is confirmed."
+  },
+  {
+   "phase": "Phase 2 — scheduling gate hardening, multi-store, per-store limits UI, and the office tab",
+   "goal": "The player manages everything from a \"Store Managers\" tab on the HQ BizMan panel that looks and behaves like the HR/Logistics manager tabs: add a plan, pick a scheduled manager, assign up to the skill cap of stores, set per-store limits. Multi-store supervision runs end to end.",
+   "tasks": [
+    "Dependencies/0Harmony.dll — add (flat managed DLL, ModValidator rule 12). Bump asmdef if needed.",
+    "Interop/Patches/BizManBusinessPatches.cs — NEW: Harmony patches on BizManBusiness.SetUpTabs (inject \"StoreManagers\" for HQ), SetTab (route + activate mod container), Awake/OnEnable (build menu button + container GameObjects). Wrap every patch body in try/catch; on failure log + set a static DegradedToPanel flag.",
+    "UI/BizManStoreManagerTab.cs — NEW: runtime-built uGUI mirroring HrManagersPlanList (left: plan list + add-plan + manager dropdown filtered to assignedAddress==HQ && HasSkill(\"ba:skill_logisticsmanager\") && IsAssignedToAnyWorkShift() && not on another plan) and LogisticsManagerDestinationUI (right: supervised-store rows with a remove button + per-store cap slider + staffing dropdown; add-store button disabled at MaxStores).",
+    "UI/StoreManagerPanel.cs — NEW: the same controls as a custom ModOption subclass overriding SpawnUi(Transform), used when Patches.DegradedToPanel or as the always-available fallback. UI/PolicyOptions.cs registers it via AddCustom.",
+    "Runtime/ManagerDirectory.cs — add multi-store cap enforcement + fan-out; Runtime/DailyOperations already loops assignments — verify budget accounting is per-store.",
+    "Interop/Feedback.cs — point deep-link onClick at fullMenu.bizMan.Open(hqAddress, \"StoreManagers\") + select the plan (guard for DegradedToPanel).",
+    "Interop/GameBindings.cs — add GetSupervisableStores() (BuildingRegistrations RentedByPlayer + revenue business + not supervised by another plan) and a guard against the manager also being bound to a real vanilla LogisticsManagerPlan (LogisticsManagerHelper.GetAssignedPlanForEmployee).",
+    "Manual in-game test: full flow through the HQ tab on a save with 3+ stores and a skill-100 manager; unschedule the manager and confirm the tab shows the NoManager state and the plan goes dormant."
+   ],
+   "riskyItem": "The Harmony patches on BizManBusiness (SetUpTabs/SetTab/Awake): the tab list is a private List<string>, tabs are name-matched prefab children of a serialized `containers` transform, and this UI is the most likely thing to change between Big Ambitions builds. A bad patch could break the entire HQ panel. Mitigate with defensive try/catch, a DegradedToPanel fallback to the ModOption.SpawnUi UI, and a game-version check logged at load."
+  },
+  {
+   "phase": "Phase 3 — polish and deferred",
+   "goal": "Closer-to-native identity and the lower-priority requests, added only once the core loop is proven in playtest.",
+   "tasks": [
+    "Optional custom skill: Domain skill \"storemanager:skill_manager\" registered by re-injecting SkillHelper.OnSkillDataLoaded(existing + new SkillData) in [ModEntryOnCityLoad]; add the Harmony null-guard on SkillHelper.GetData; migrate wage curve + a dedicated \"Store Manager\" job title + contact. Requires verifying every unguarded GetData call site in-game first.",
+    "AssetBundle: replace the runtime-built BizMan tab uGUI with a prefab styled to match vanilla manager tabs (RelativeAssetBundlePaths + AssetService.Spawn + RemapShaders).",
+    "Price policy: make PricePolicy.TrackTargetMargin actually write store.retailPrices via the PricingManagerPlan.ApplyManualPrice pattern, with restore-on-detach.",
+    "Training budget: drive EmployeeInstance.trainingSession / EmployeeHelper.GetTrainingCost for supervised-store staff within assignment.WeeklyTrainingBudget.",
+    "PlayerScheduling/PlayerShift.cs + RegisterHandoff.cs: finish the self-roster feature and hook RegisterHandoff to the real employee clock-in event (fixes the register-handoff bug).",
+    "Manager-quits model on Hard difficulty (DifficultyProfile.ManagersCanQuit) with a phone-message warning path.",
+    "Headhunter integration: let a HeadhunterPlan recruit the store-manager skill; auto-replacement parity for an absent manager.",
+    "Per-product restock target sliders in the tab (vs v1's sales-derived auto-targets)."
+   ],
+   "riskyItem": "The custom-skill migration: the research flags ~8 base-game call sites that do SkillHelper.GetData(name).<field> with no null check and will NullReferenceException for an unregistered skill, and SkillHelper (unlike BusinessTypeHelper) does NOT preserve mod entries across reloads, so the skill must be re-injected on every city load and every in-city scene reload. Only attempt after a full in-game audit; keep ba:skill_logisticsmanager as the shipping default if any call site cannot be guarded."
+  }
+ ],
+ "codeChanges": [
+  {
+   "file": "mod/StoreManager/Scripts/Core/StoreManagerMod.cs",
+   "action": "rewrite",
+   "detail": "Keep the two entry classes. City entry now: discover the HQ, load plans from GameInstance.modData, subscribe GlobalEvents.onNewDay/onNewHour/onSaveGame/onJobChange, flush modData on save + unload. Drop the RegisterHandoff wiring to Phase 3."
+  },
+  {
+   "file": "mod/StoreManager/Scripts/Domain/StoreManagerData.cs",
+   "action": "delete",
+   "detail": "Superseded by Domain/StoreManagerPlan.cs. Move WeekTally into the new file unchanged."
+  },
+  {
+   "file": "mod/StoreManager/Scripts/Domain/StoreManagerPlan.cs",
+   "action": "add",
+   "detail": "Plan-centric record: ManagerEmployeeId, HqAddress, List<StoreAssignment>, WeekTally, MistakeSeed, Dormant + GraceDays. MaxStores => 1 + floor(skill0to100/25). [Serializable], no [Obsolete] members (Odin policy skips those)."
+  },
+  {
+   "file": "mod/StoreManager/Scripts/Domain/StoreAssignment.cs",
+   "action": "add",
+   "detail": "Per-store limits: Address Store, decimal WeeklyRestockBudgetCap, StaffingLevel Staffing, PricePolicy Pricing, double TargetMarginPct, plus a captured DeliveryContract snapshot (enabled/repeatingOrder/items) for restore-on-detach."
+  },
+  {
+   "file": "mod/StoreManager/Scripts/Domain/StorePolicy.cs",
+   "action": "keep",
+   "detail": "Kept as the per-assignment value type and the source of global defaults. Enums (StaffingLevel, PricePolicy, LeaveApprovalMode) unchanged."
+  },
+  {
+   "file": "mod/StoreManager/Scripts/Domain/ManagerRank.cs",
+   "action": "rewrite",
+   "detail": "Collapse the Employee/TeamLeader/AssistantManager/Manager ladder to a single Manager role (a mod plan has one manager, like every vanilla HQ plan). Keep only the wage-band helper and locale key."
+  },
+  {
+   "file": "mod/StoreManager/Scripts/Domain/ManagementSkill.cs",
+   "action": "rewrite",
+   "detail": "Re-base on the live EmployeeInstance skill value (0–100 via GetSkillValue(\"ba:skill_logisticsmanager\")). Keep the 1–5 bucket mapping only as MistakeModel tuning input; keep ToGameScale/FromGameScale."
+  },
+  {
+   "file": "mod/StoreManager/Scripts/Domain/MistakeModel.cs",
+   "action": "keep",
+   "detail": "Still the manager-quality model. No change beyond taking skill from the live value."
+  },
+  {
+   "file": "mod/StoreManager/Scripts/Domain/DifficultyProfile.cs",
+   "action": "keep",
+   "detail": "Unchanged."
+  },
+  {
+   "file": "mod/StoreManager/Scripts/Domain/Num.cs",
+   "action": "keep",
+   "detail": "Unchanged."
+  },
+  {
+   "file": "mod/StoreManager/Scripts/Interop/GameBindings.cs",
+   "action": "rewrite",
+   "detail": "Heavy: add GetHeadquarters, IsScheduledAtHq, GetLogisticsManagerCandidatesAtHq, GetSupervisableStores, ReadModData/WriteModData against SaveGameManager.Current.modData, guard vs vanilla LogisticsManagerPlan binding. Complete the SendManagerMessage/Contact and player-station stubs. Remove the shelf-redistribution restock path (moves to Interop/DeliveryContracts.cs)."
+  },
+  {
+   "file": "mod/StoreManager/Scripts/Interop/ModDataStore.cs",
+   "action": "keep",
+   "detail": "Demoted to fallback sink only; called by GameBindings.ReadModData/WriteModData when modData round-trip returns empty. Add save-identity keying."
+  },
+  {
+   "file": "mod/StoreManager/Scripts/Interop/Serialization.cs",
+   "action": "rewrite",
+   "detail": "Envelope now wraps List<StoreManagerPlan>. Keep OdinSerializer DataFormat.JSON."
+  },
+  {
+   "file": "mod/StoreManager/Scripts/Interop/Loc.cs",
+   "action": "keep",
+   "detail": "Unchanged."
+  },
+  {
+   "file": "mod/StoreManager/Scripts/Interop/Feedback.cs",
+   "action": "add",
+   "detail": "Notifications.Show + Contact/TextMessage wrappers with deep-link onClick to bizMan.Open(hqAddress, tab)."
+  },
+  {
+   "file": "mod/StoreManager/Scripts/Interop/DeliveryContracts.cs",
+   "action": "add",
+   "detail": "GetOrCreateContract / SetTargets (ProcessStockTarget algorithm) / Enable / Disable / Snapshot / Restore, all guarded by DeliveryHelper.CanModifyContract."
+  },
+  {
+   "file": "mod/StoreManager/Scripts/Interop/Recruiting.cs",
+   "action": "add",
+   "detail": "SpawnCandidate(skillValue) => RecruitmentHelper.GenerateCandidate(\"ba:skill_logisticsmanager\",...); Hire => EmployeeHelper.HireCandidate + assignedAddress = HQ."
+  },
+  {
+   "file": "mod/StoreManager/Scripts/Interop/Patches/BizManBusinessPatches.cs",
+   "action": "add",
+   "detail": "Phase 2. Harmony patches on BizManBusiness.SetUpTabs / SetTab / Awake to inject and route the \"StoreManagers\" HQ tab. try/catch with a DegradedToPanel fallback flag."
+  },
+  {
+   "file": "mod/StoreManager/Scripts/Runtime/ManagerDirectory.cs",
+   "action": "rewrite",
+   "detail": "Registry keyed by manager EmployeeInstance.id. Load from modData, Reconcile each tick against EmployeeHelper.GetEmployeeById + IsScheduledAtHq, subscribe onJobChange, 3-day grace + restore-on-detach, cap-enforced Assign/UnassignStore."
+  },
+  {
+   "file": "mod/StoreManager/Scripts/Runtime/ManagedStore.cs",
+   "action": "rewrite",
+   "detail": "Renamed to ManagedPlan.cs: one manager, N StoreAssignments, RunDay loops the assignments, gate on manager-present + scheduled."
+  },
+  {
+   "file": "mod/StoreManager/Scripts/Runtime/DailyOperations.cs",
+   "action": "rewrite",
+   "detail": "Restock() rewritten to drive the repeating DeliveryContract via Interop/DeliveryContracts within the per-store budget cap, raising a toast on cap-hit. Schedule()/Complaints()/Leave() keep their shape; Schedule() still calls ScheduleAutoFiller for the store roster."
+  },
+  {
+   "file": "mod/StoreManager/Scripts/Runtime/WeeklyDigest.cs",
+   "action": "keep",
+   "detail": "Minor: Send() also raises a Feedback.Notify summary toast; report composition unchanged."
+  },
+  {
+   "file": "mod/StoreManager/Scripts/UI/PolicyOptions.cs",
+   "action": "rewrite",
+   "detail": "Global DEFAULTS only (staffing, restock cap, pricing) that seed new StoreAssignments; register the custom StoreManagerPanel via AddCustom. Drop the interim per-store hire buttons (move to the panel/console)."
+  },
+  {
+   "file": "mod/StoreManager/Scripts/UI/StoreManagerPanel.cs",
+   "action": "add",
+   "detail": "Phase 2. Custom ModOption subclass; SpawnUi builds the hire/assign/limits uGUI. Always-available fallback for the BizMan tab."
+  },
+  {
+   "file": "mod/StoreManager/Scripts/UI/BizManStoreManagerTab.cs",
+   "action": "add",
+   "detail": "Phase 2. Runtime-built uGUI panel parented under BizManBusiness.containers, mirroring HrManagersPlanList + LogisticsManagerDestinationUI."
+  },
+  {
+   "file": "mod/StoreManager/Scripts/Debug/StoreManagerCommands.cs",
+   "action": "keep",
+   "detail": "Update command set: Recruit / Assign <storeId> / Unassign <storeId> / SetCap <storeId> <amount> / Status / RunDay / RunWeek / SelfTest. Keep the delegate-ref registration pattern."
+  },
+  {
+   "file": "mod/StoreManager/Scripts/PlayerScheduling/PlayerShift.cs",
+   "action": "keep",
+   "detail": "Untouched in Phase 1–2; finished in Phase 3 (self-roster feature)."
+  },
+  {
+   "file": "mod/StoreManager/Scripts/PlayerScheduling/RegisterHandoff.cs",
+   "action": "keep",
+   "detail": "Untouched in Phase 1–2; hooked to the real clock-in event in Phase 3."
+  },
+  {
+   "file": "mod/StoreManager/Locales/en.json",
+   "action": "rewrite",
+   "detail": "Add notification/message/transaction/panel keys; drop the removed rank keys."
+  },
+  {
+   "file": "mod/StoreManager/Locales/nl.json",
+   "action": "rewrite",
+   "detail": "Mirror en.json."
+  },
+  {
+   "file": "mod/StoreManager/Dependencies/0Harmony.dll",
+   "action": "add",
+   "detail": "Phase 2. Flat managed DLL per D2 / ModValidator rule 12."
+  },
+  {
+   "file": "C:/Source/BigAmbitions-StoreManagerMod/DECISIONS.md",
+   "action": "rewrite",
+   "detail": "Apply the D3/D4/D5/D6 amendments and add D9 (core architecture = Option B) and D10 (skill choice) as worded in decisionAmendments; update the wage-ladder table to the single Manager role."
+  }
+ ],
+ "risks": [
+  "DeliveryContract mutation from onNewDay may collide with DeliveryHelper.CanModifyContract windows and the game's own BusinessHelper.HandleWholesaleDeliveries pass; a wrong wholesaleAddress silently produces failed deliveries. Test against an existing contract before creating new ones.",
+  "Reusing ba:skill_logisticsmanager: the same employee also appears as an assignable candidate in the vanilla LogisticsManagers HQ tab, so a player could bind it to a real logistics plan and the mod plan simultaneously. Mitigate by checking LogisticsManagerHelper.GetAssignedPlanForEmployee and warning in the panel; fallback skill is ba:skill_hrmanager.",
+  "Harmony BizMan patches (SetUpTabs/SetTab/Awake) target private members and prefab-driven UI — the most update-fragile surface in the game. Guard with try/catch + a DegradedToPanel fallback and a version check.",
+  "GameInstance.modData round-trip through the OdinSerializer binary save path is unverified for a large string; the persistentDataPath file fallback must be wired from day one.",
+  "The HQ must contain an office-desk workstation whose suitableSkills includes the chosen manager skill or the manager cannot be scheduled and the plan never activates. The panel must detect this and tell the player.",
+  "A manager fired mid-week (onJobChange) leaves a dangling plan and supervised stores mid-contract; the 3-day grace + restore-on-detach must be exercised in test, including the fire-then-rehire case.",
+  "SkillHelper.OnSkillDataLoaded does not preserve mod skills across reloads and several base-game GetData call sites are unguarded — the Phase 3 custom-skill option can NPE the employee card / scheduler / wage calc if shipped without a full in-game audit and a Harmony guard.",
+  "Odin serialization policy skips [Obsolete] members — ensure no StoreManagerPlan/StoreAssignment field is ever marked obsolete during refactors or it silently stops persisting.",
+  "Multi-store fan-out cost accounting: per-store budget caps must be tracked independently in WeekTally or one busy store can starve the others' restock."
+ ]
+}

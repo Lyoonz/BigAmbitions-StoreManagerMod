@@ -49,15 +49,17 @@ path and a few `// VERIFY` field names. Everything else is proven.
   shows in the BizMan schedule, employee turns up). The test save had 0 staff anywhere.
 - Then clear the last few `// VERIFY` field-name notes off the probe dump.
 
-### 3. Phase 1 — core, one store
-- **Hiring entry point — done:** debug-console commands `StoreManager.Hire manager|assistant <1-5>`,
-  `.Status`, `.RunDay`, `.RunWeek` (`Scripts/Debug/StoreManagerCommands.cs`), verified registering
-  in the real game. First playtest uses these; a proper UI is later polish.
-- **Left:** on a save with a hired shop employee, run `StoreManager.Hire manager 4` + `.RunDay`
-  and watch the daily loop. Tune `ManagementSkill` / `MistakeModel` / `DifficultyProfile`
-  numbers (all placeholders) against how it feels. Confirm save round-trip with a manager assigned.
-- This is the part that needs a human playing — the "great vs poor manager" feel is a balance
-  judgement, not something to derive.
+### 3. Phase 1 — core, one store  *(runs end-to-end; needs playtest tuning)*
+- **Done & verified in-game:** hiring (options-menu buttons + `StoreManager.Hire/.Status/.RunDay/
+  .RunWeek`), and the full runtime loop — `ManagedStore → DailyOperations → MistakeModel →
+  WeeklyDigest` — runs 7 days end-to-end against a live store with zero exceptions.
+  `StoreManager.SelfTest <skill>` re-runs that whole validation anytime.
+- **Left (needs a human playing, time advancing):**
+  1. Load a save with a hired shop employee, `StoreManager.Hire manager 4`, play a real week.
+  2. Watch the weekly digest message; check `StoreManager.Status`.
+  3. Tune `ManagementSkill` / `MistakeModel` / `DifficultyProfile` against how "poor vs great"
+     *feels* — `sim/BalanceSim` gives the numbers, playing gives the verdict.
+  4. Confirm the save round-trips with a manager assigned (`ModDataStore` file).
 
 ### 4. Phase 2 — player scheduling + register handoff
 - Add the player to the schedule UI as a schedulable entity (`PlayerScheduleBook`).

@@ -34,3 +34,6 @@ Thumbs.db
 # Build check output
 build/bin/
 build/obj/
+
+# Regenerated decompile (licensed game content — never commit)
+_decomp/

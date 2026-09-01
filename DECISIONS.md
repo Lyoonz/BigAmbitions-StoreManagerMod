@@ -107,3 +107,73 @@ scratch. StuartArmour flagged it as "a bit much" himself.
 | Team Leader | $20–23 | low |
 | Assistant Manager | $24–27 | mid |
 | Manager | $28–32 | high |
+
+*(Superseded by D10/D11 — the manager is now a real hired employee on `ba:skill_purchasingagent`,
+paid the game's own wage for that skill via `EmployeeHelper.CalculateHourlyWageForSkill`. The
+ladder above is vestigial.)*
+
+---
+
+# v2 pivot — the manager becomes a real meta-role (2026-09-01)
+
+The user rejected v1's off-screen data role. They want: hire via the office like an HR Manager,
+appear in My Employees, schedule the manager, assign to N stores, set per-store limits,
+auto-restock via delivery — all with visible feedback. Backed by a research + design workflow
+and an in-game reflection dump. Full architecture: `docs/DESIGN-v2.md`. Raw research: `docs/research/`.
+
+## D9 — Architecture: Option B (mod-owned supervision plan)
+
+A parallel **mod-owned plan** that mimics `HrManagerPlan`/`LogisticsManagerPlan`, all state in
+`GameInstance.modData`. **Reject** Option A (piggyback a real `LogisticsManagerPlan` — it
+restocks from a *warehouse*, not a wholesale contract; its `GameInstance` list can't be safely
+grown). **Reject** Option C (Harmony-inject a real plan type — dual serializers Newtonsoft
+`TypeNameHandling.Auto` + OdinSerializer binary + `Player.SaveSystem.CompatibilityFixes.*` purge
+passes → save-corruption risk).
+
+## D10 — Manager skill: `ba:skill_purchasingagent`
+
+Confirmed by the reflection dump: a real "Purchasing Agent" skill with **no HQ manager plan/tab**
+(unlike hrmanager/logisticsmanager/pricingmanager/headhunter), so no dual-binding hazard. Guard
+anyway with `LogisticsManagerHelper.GetAssignedPlanForEmployee(id)` etc. **No custom skill** —
+`SkillHelper.GetData(name)` is called unguarded in candidate generation / wage calc / the
+employee card, and `SkillHelper` doesn't persist mod skills across reloads.
+
+## D11 — v1 scope: the TRIMMED version (both adversarial reviews)
+
+**In:** vanilla recruit→hire→schedule (requirements 2/3/4 for free); a `ModOption.SpawnUi` panel
++ console for assign-to-N-stores + per-store limits (5/6); a weekly delivery-contract planner
+within budget (7); full visible feedback (1); reconcile-on-fire.
+**Out (mostly permanently):** Harmony-injected HQ tab, custom skill, `MistakeModel` /
+`ManagerRank` ladder / `DifficultyProfile` coupling, `ScheduleAutoFiller` roster top-up,
+complaints/leave/training, price-policy writes, contract snapshot/restore beyond `enabled=false`,
+3-day grace state machine, player self-scheduling.
+
+## D12 — Restock runs on the WEEKLY Monday delivery cycle, not per-day
+
+`DeliveryHelper`: `DeliveryDay` = Monday, delivery ~08:00, lock Sun ~20:00 → Mon ~08:00. The
+planner runs **once per week** (trigger `onNewDay` when day-of-week is Saturday), computes next
+Monday's per-store order within `WeeklyRestockBudgetCap`, respects `CanModifyContract`, no-ops
+the rest of the week.
+
+## D13 — Persistence: `GameInstance.modData["StoreManager.plans.v1"]`
+
+Confirmed `Dictionary<string,string>` and **already used by the CosaNostra mod** → proven to
+round-trip the save. Plain JSON of `List<StoreManagerPlan>`. Write on `GlobalEvents.onSaveGame`,
+read on `[ModEntryOnCityLoad]`. `persistentDataPath` file (`Interop/ModDataStore.cs`) stays as a
+keyed fallback, wired from day one. On load: drop plans whose `ManagerEmployeeId` doesn't resolve;
+set their contracts `enabled=false`.
+
+## D3, D4, D5, D6 — amended by the v2 pivot
+
+- **D3** (was: off-screen data role): the manager is now a real `Entities.EmployeeInstance`
+  recruited through the vanilla flow, hired via `EmployeeHelper.HireCandidate`, in My Employees
+  with a real wage and a player-set schedule. The mod adds only the supervision plan; never
+  subclasses `EmployeeInstance`. Still no bespoke NPC body.
+- **D4** (was: global ModOptions + phone digest): per-action `Notifications.Show` toast +
+  weekly `Contact`/`TextMessage` thread + finance line items. Hire/assign/limits UI is a
+  **per-store** `ModOption.SpawnUi` panel; global ModOptions keeps only defaults.
+- **D5** (add): the manager is rostered by the player via the vanilla BizMan → HQ → Schedule
+  tab. The mod plan is gated on `EmployeeInstance.IsAssignedToAnyWorkShift()` at the HQ and goes
+  dormant when unscheduled.
+- **D6** (was: per-store `StoreManagerData` file): now a plan-centric `List<StoreManagerPlan>`
+  in `GameInstance.modData` (see D13). The `persistentDataPath` file is demoted to fallback.

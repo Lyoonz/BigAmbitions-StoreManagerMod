@@ -33,6 +33,14 @@ namespace StoreManagerProbe
 
         public Task OnLoadAsync(ModContext context)
         {
+            // Auto-load is opt-in — it can hijack a save the player is trying to load. Drop a file
+            // named "probe-autoload" next to the mod DLL to enable it.
+            var flag = System.IO.Path.Combine(context.ModRootPath ?? ".", "probe-autoload");
+            if (!System.IO.File.Exists(flag))
+            {
+                context.Logger.Info("AutoLoad disabled (no 'probe-autoload' file) — load a save yourself; the probe runs on city load.");
+                return Task.CompletedTask;
+            }
             _host = new GameObject("StoreManagerProbeAutoLoad");
             UnityEngine.Object.DontDestroyOnLoad(_host);
             _host.AddComponent<AutoLoadRunner>().Logger = context.Logger;
@@ -127,23 +135,25 @@ namespace StoreManagerProbe
         private void DumpWorkforceGraph()
         {
             var sgm = SaveGameManager.Current;
-            int staffed = sgm!.BuildingRegistrations.Count(r => r.scheduleDays != null && r.scheduleDays.Count > 0 &&
-                EmployeeHelper.GetEmployeeInstances(new EmployeeInstancesQueryInfo { withAssignedAddress = r.Address }).Count > 0);
-            Log($"day={TimeHelper.CurrentDay} dow={TimeHelper.GetDayOfWeek()} regs={sgm.BuildingRegistrations.Count} " +
-                $"staffedBusinesses={staffed} deliveryContracts={sgm.DeliveryContracts?.Count}");
-            foreach (var b in sgm!.BuildingRegistrations)
+            var allEmps = EmployeeHelper.GetEmployeeInstances();   // unfiltered
+            Log($"day={TimeHelper.CurrentDay} dow={TimeHelper.GetDayOfWeek()} regs={sgm!.BuildingRegistrations.Count} " +
+                $"TOTAL employees in save = {allEmps.Count}  deliveryContracts={sgm.DeliveryContracts?.Count}");
+
+            // every employee and where the game thinks it works
+            foreach (var e in allEmps)
+                Log($"  EMP {e.characterData?.name} id={e.id} assignedAddress={(e.assignedAddress == null ? "NULL" : e.assignedAddress.ToString())} " +
+                    $"wage={e.hourlyWage} absent={e.isAbsent} skill={e.GetPrimarySkill()}");
+
+            // every player business, with station + employee count via BOTH lookup paths
+            foreach (var b in sgm.BuildingRegistrations)
             {
                 if (!(b.RentedByPlayer || b.BuildingOwnedByPlayer)) continue;
-                Log($"STORE '{b.BusinessName}' addr={b.Address} type={b.businessTypeName} " +
-                    $"days={b.scheduleDays?.Count} sat={b.satisfaction?.overall} avgDailyIncome={b.GetAvgDailyIncome(1)}");
-                var emps = EmployeeHelper.GetEmployeeInstances(new EmployeeInstancesQueryInfo { withAssignedAddress = b.Address });
-                foreach (var e in emps)
-                    Log($"  EMP {e.id} wage={e.hourlyWage} stations=[{string.Join(",", e.assignedWorkStationItems)}] " +
-                        $"weeklyHrs={e.assignedWeeklyHours} absent={e.isAbsent} skillPrimary={e.GetPrimarySkill()}");
-                if (b.scheduleDays != null)
-                    foreach (var d in b.scheduleDays)
-                        foreach (var s in d.workShifts)
-                            Log($"  SHIFT day={d.day} emp={s.employeeId} {s.startingHour}-{s.endingHour} station={s.itemInstanceId}");
+                int byAddr = EmployeeHelper.GetEmployeeInstances(new EmployeeInstancesQueryInfo { withAssignedAddress = b.Address }).Count;
+                int stations = 0;
+                try { stations = b.GetAssignableItems().Count; } catch { }
+                int shifts = b.scheduleDays?.Sum(d => d.workShifts.Count) ?? 0;
+                Log($"BIZ '{b.BusinessName}' addr={b.Address} type={b.businessTypeName} rented={b.RentedByPlayer} owned={b.BuildingOwnedByPlayer} " +
+                    $"empByAddr={byAddr} assignableStations={stations} totalShifts={shifts} sat={b.satisfaction?.overall} income={b.GetAvgDailyIncome(1)}");
             }
         }
 
