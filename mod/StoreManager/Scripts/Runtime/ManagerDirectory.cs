@@ -60,7 +60,11 @@ namespace StoreManager.Runtime
             _plans.FirstOrDefault(p => p.Supervises(storeAddress));
 
         // ── player actions ──────────────────────────────────────────────────────
-        public ActionResult AdoptManager(string hqAddress, string employeeId)
+        public ActionResult AdoptManager(string hqAddress, string employeeId) =>
+            AdoptManager(hqAddress, employeeId, skipScheduleCheck: false);
+
+        /// <param name="skipScheduleCheck">true only for the in-game SelfTest harness.</param>
+        public ActionResult AdoptManager(string hqAddress, string employeeId, bool skipScheduleCheck)
         {
             if (_plans.Any(p => p.ManagerEmployeeId == employeeId))
                 return ActionResult.No("that employee is already a Store Manager");
@@ -71,7 +75,7 @@ namespace StoreManager.Runtime
                 return ActionResult.No("employee doesn't have the Purchasing Agent skill");
             if (GameApi.IsBoundToVanillaPlan(employeeId))
                 return ActionResult.No("that employee is already assigned to an HR / Logistics / Pricing manager plan");
-            if (!GameApi.IsScheduledAtHq(employeeId, hqAddress))
+            if (!skipScheduleCheck && !GameApi.IsScheduledAtHq(employeeId, hqAddress))
                 return ActionResult.No("schedule the manager on an HQ desk first (BizMan → HQ → Schedule)");
 
             var plan = new StoreManagerPlan { ManagerEmployeeId = employeeId, HqAddress = hqAddress };

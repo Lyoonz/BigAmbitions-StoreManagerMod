@@ -36,6 +36,17 @@ namespace StoreManager.Interop
 
         public static bool HasContract(string storeAddress) => Get(storeAddress) != null;
 
+        /// <summary>Human-readable one-liner of a store's contract, for logs/self-test.</summary>
+        public static string Describe(string storeAddress)
+        {
+            var c = Get(storeAddress);
+            if (c == null) return "(no contract)";
+            int items = c.items?.Count ?? 0;
+            int sum = c.items?.Where(i => i != null).Sum(i => i.amount) ?? 0;
+            return $"enabled={c.enabled} repeating={c.repeatingOrder} nextDay={c.nextDeliveryDay} " +
+                   $"items={items} totalAmount={sum} costPerDelivery={SafeTotal(c):N0} canModify={CanModifyNow(storeAddress)}";
+        }
+
         public static bool CanModifyNow(string storeAddress)
         {
             var c = Get(storeAddress);
