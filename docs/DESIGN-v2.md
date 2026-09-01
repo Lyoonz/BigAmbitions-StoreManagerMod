@@ -138,19 +138,23 @@ Entities.Contact.SendMessage(TextMessage, bool notify=true, bool sendNotificatio
 new Entities.TextMessage(string messageKey, Dictionary<string,string> data=null, ...)
 ```
 
-### Still to verify in-game (fold into Phase 1 testing, don't block on it)
-1. Does the HQ ship with an assignable desk workstation whose `suitableSkills` includes
-   `ba:skill_purchasingagent`? (The reflection dump's `BuildingRegistrations` walk failed — the
-   property accessor was wrong; re-check with the typed path.) If not, the manager can't be
-   scheduled → the panel must detect and tell the player.
-2. `DeliveryContract` / `DeliveryContractItem` full field shape on a live save (partly known from
-   decompile: `DeliveryContract { enabled, repeatingOrder, nextDeliveryDay, wholesaleAddress,
-   businessAddress, deliveryFee, items }`, `DeliveryContractItem { itemName, amount,
-   amountOrderedLastWeek, amountOrderedThisWeek }`).
-3. Editing an **existing** player contract's `enabled`/`items[].amount` on a Tue–Sat: does it
-   survive to Monday's delivery + bill the player + not get overwritten by the game's own pass?
-   Test that before ever creating a contract from scratch.
-4. `onSaveGame` fires synchronously before serialize (so a handler writing `modData` lands in the file).
+### Verified in-game 2026-09-01 (v2 probe, day-8 save, no HQ)
+- ✅ v2 mod loads clean against Build 3672: `Store Manager loaded (v2)` + `active — 0 plan(s)`, no exceptions.
+- ✅ `GameInstance.modData` is `Dictionary<string,string>`, reachable, empty on a fresh save.
+- ✅ `SaveGameManager.Current.DeliveryContracts` → `DeliveryContract { businessAddress, wholesaleAddress,
+  enabled, repeatingOrder, nextDeliveryDay, items[] }`; a store had a 9-item contract (disabled).
+- ✅ `BuildingRegistration.GetAssignableItems()` → each `ItemInstance.ItemCached.suitableSkills`,
+  e.g. `ba:itemname_cashregister` → `[ba:skill_customerservice]`, `ba:itemname_cleaningstation` → `[ba:skill_cleaning]`.
+- ✅ `GameApi` / `DeliveryContracts` read paths all work, zero exceptions.
+
+### Still to verify — needs a save WITH an HQ (the SelfTest bails without one)
+1. Does the HQ have an assignable desk workstation whose `suitableSkills` includes
+   `ba:skill_purchasingagent` (so the manager can be scheduled)? If not, the panel must say so.
+   — the v2 probe now dumps every owned building's stations + `suitableSkills`, so an HQ-save run answers this.
+2. Editing an **existing** contract's `enabled`/`items[].amount` on a Tue–Sat: survives to Monday's
+   delivery + bills the player + not overwritten by the game's own pass? (`StoreManager.SelfTest`
+   logs the contract before/after; run it, then advance to Monday to see the delivery.)
+3. `onSaveGame` fires synchronously before serialize (write `modData`, save, reload, check it's there).
 
 ---
 
