@@ -132,11 +132,15 @@ passes → save-corruption risk).
 
 ## D10 — Manager skill: `ba:skill_purchasingagent`
 
-Confirmed by the reflection dump: a real "Purchasing Agent" skill with **no HQ manager plan/tab**
-(unlike hrmanager/logisticsmanager/pricingmanager/headhunter), so no dual-binding hazard. Guard
-anyway with `LogisticsManagerHelper.GetAssignedPlanForEmployee(id)` etc. **No custom skill** —
-`SkillHelper.GetData(name)` is called unguarded in candidate generation / wage calc / the
-employee card, and `SkillHelper` doesn't persist mod skills across reloads.
+A real "Purchasing Agent" skill. **Correction (v2 static review):** it *does* have an HQ tab
+(`PurchasingAgentsPlanList`) — but that drives `ImportPartnership` (importer/warehouse) contracts,
+**not** the store `DeliveryContract` the mod tunes, so there is no direct mechanism collision.
+The dual-binding guard (`GameApi.IsBoundToVanillaPlan`) now checks all four:
+`LogisticsManagerHelper` / `HrManagerHelper` / `PricingManagerHelper` /
+`PurchasingAgentHelper.GetAssignedPlanForPurchasingAgent` — so the same employee can't run a mod
+plan and a vanilla plan at once. **No custom skill** — `SkillHelper.GetData(name)` is called
+unguarded in candidate generation / wage calc / the employee card, and `SkillHelper` doesn't
+persist mod skills across reloads.
 
 ## D11 — v1 scope: the TRIMMED version (both adversarial reviews)
 
@@ -154,6 +158,22 @@ complaints/leave/training, price-policy writes, contract snapshot/restore beyond
 planner runs **once per week** (trigger `onNewDay` when day-of-week is Saturday), computes next
 Monday's per-store order within `WeeklyRestockBudgetCap`, respects `CanModifyContract`, no-ops
 the rest of the week.
+
+**Correction (v2 static review):** the per-line order target is `amountOrderedLastWeek` (real
+units the game delivered last week) plus a capped gap top-up toward
+`CountTotalResourcesInStock` vs `TargetDaysOfStock`. It must **never** be a function of the
+line's own current `amount` (the first draft did `round(GetOrderAmount * TargetDays/7)` and wrote
+it back → geometric compounding, since `DeliveryHelper.GetOrderAmount` just echoes `amount`).
+The target now converges to steady-state weekly demand.
+
+## D14 — Unreadable saved blob → read-only mode, never overwrite
+
+If `GameInstance.modData["StoreManager.plans.v1"]` is present but won't parse (game/Odin update,
+assembly rename, partial write), the directory enters **read-only mode**: it takes no actions,
+writes nothing, shows a warning toast, and leaves the blob intact for a future version to
+recover. It must never silently replace an unreadable-but-present blob with an empty document —
+that would also destroy every `OriginalContract` snapshot (the only record of the player's real
+pre-supervision delivery contracts).
 
 ## D13 — Persistence: `GameInstance.modData["StoreManager.plans.v1"]`
 

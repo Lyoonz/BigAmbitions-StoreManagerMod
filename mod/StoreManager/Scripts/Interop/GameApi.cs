@@ -5,17 +5,18 @@ using System.Linq;
 using System.Reflection;
 using UnityEngine;
 
-using Entities;                              // EmployeeInstance, BuildingRegistration, DeliveryContract, DeliveryHelper, Contact, TextMessage
+using Entities;                              // EmployeeInstance, BuildingRegistration, DeliveryContract, DeliveryHelper
 using Helpers;                               // EmployeeHelper, BuildingHelper, TimeHelper
-using Buildings.Office.Headquarters;         // LogisticsManagerHelper, LogisticsManagerPlan, HrManagerHelper, PricingManagerHelper
+using Buildings.Office.Headquarters;         // *ManagerHelper dual-binding guards
 
 namespace StoreManager.Interop
 {
     /// <summary>
-    /// The single seam onto Big Ambitions. Every call here is against a type confirmed by the
-    /// in-game reflection dump (docs/research/reflection-dump-2026-09-01.txt). Risky spots are
-    /// wrapped in try/catch and log rather than throw, so a game patch degrades the mod to
-    /// "dormant + player told" instead of crashing a save.
+    /// The single seam onto Big Ambitions. Every member is against a type confirmed by the in-game
+    /// reflection dump + the Build 3672 decompile. Risky spots are try/catch'd and log rather than
+    /// throw — but note the mod's <i>event handlers</i> must also be guarded at their own frame
+    /// (see Core/StoreManagerMod.cs), because the game invokes onNewDay/onSaveGame with a plain
+    /// <c>?.Invoke()</c>.
     /// </summary>
     public static class GameApi
     {
@@ -23,7 +24,6 @@ namespace StoreManager.Interop
         public const string HqBusinessType = "ba:businesstype_headquarters";
         private const string EmptyBusinessType = "ba:businesstype_empty";
 
-        // ── lightweight handles the mod passes around (game types don't leak past this file) ──
         public readonly struct Ref
         {
             public string Address { get; }
@@ -45,28 +45,32 @@ namespace StoreManager.Interop
         // ── time ────────────────────────────────────────────────────────────────
         public static int CurrentDay => SafeGet(() => TimeHelper.CurrentDay, 0);
         public static string CurrentDayOfWeek => SafeGet(() => TimeHelper.GetDayOfWeek().ToString(), "Monday");
-
-        /// <summary>The weekly restock planner runs once per week, before the Monday delivery lock (D12).</summary>
         public static bool IsWeeklyPlanningDay => CurrentDayOfWeek.Equals("Saturday", StringComparison.OrdinalIgnoreCase);
 
-        // ── headquarters + stores ───────────────────────────────────────────────
+        // ── save / buildings ───────────────────────────────────────────────────
         private static GameInstance? Save => SaveGameManager.Current;
 
         private static IEnumerable<BuildingRegistration> PlayerBuildings =>
-            Save?.BuildingRegistrations?.Where(b => b != null && (b.RentedByPlayer || b.BuildingOwnedByPlayer))
-            ?? Enumerable.Empty<BuildingRegistration>();
+            (Save?.BuildingRegistrations ?? new List<BuildingRegistration>())
+            .Where(b => b != null && b.Address != null && (b.RentedByPlayer || b.BuildingOwnedByPlayer));
+
+        private static string A(BuildingRegistration b)
+        {
+            try { return b.Address?.ToString() ?? ""; } catch { return ""; }
+        }
 
         public static List<Ref> GetHeadquarters() =>
             PlayerBuildings.Where(b => b.businessTypeName == HqBusinessType)
-                           .Select(b => new Ref(b.Address.ToString(), b.BusinessName))
+                           .Select(b => new Ref(A(b), b.BusinessName))
+                           .Where(r => r.Address.Length > 0)
                            .ToList();
 
-        /// <summary>Retail/revenue businesses the player owns that could be supervised.</summary>
         public static List<Ref> GetSupervisableStores() =>
             PlayerBuildings.Where(b => b.businessTypeName != HqBusinessType
                                     && b.businessTypeName != EmptyBusinessType
                                     && (b.scheduleDays?.Count ?? 0) > 0)
-                           .Select(b => new Ref(b.Address.ToString(), b.BusinessName))
+                           .Select(b => new Ref(A(b), b.BusinessName))
+                           .Where(r => r.Address.Length > 0)
                            .ToList();
 
         public static string StoreName(string address) => FindBuilding(address)?.BusinessName ?? address;
@@ -77,39 +81,39 @@ namespace StoreManager.Interop
             return b != null && (b.RentedByPlayer || b.BuildingOwnedByPlayer);
         }
 
-        public static decimal GetStoreWeeklyRevenue(string address)
-        {
-            var b = FindBuilding(address);
-            return b == null ? 0m : (decimal)Math.Max(0f, b.GetAvgDailyIncome(7) * 7f);
-        }
-
         public static decimal GetStoreDailyRevenue(string address)
         {
             var b = FindBuilding(address);
-            return b == null ? 0m : (decimal)b.GetAvgDailyIncome(3);
+            try { return b == null ? 0m : (decimal)b.GetAvgDailyIncome(3); } catch { return 0m; }
         }
 
-        private static BuildingRegistration? FindBuilding(string address)
+        private static BuildingRegistration? FindBuilding(string address) =>
+            PlayerBuildings.FirstOrDefault(b => A(b) == address);
+
+        /// <summary>The live HQ <c>Address</c> object (game type), for code that must set an employee's address.</summary>
+        public static object? HqAddressObject(string hqAddress) =>
+            (Save?.BuildingRegistrations ?? new List<BuildingRegistration>())
+            .FirstOrDefault(b => b != null && b.Address != null && b.Address.ToString() == hqAddress)?.Address;
+
+        // ── employee subsystem ─────────────────────────────────────────────────
+        /// <summary>True once the employee dictionary is populated — a gate before any destructive reconcile.</summary>
+        public static bool EmployeeSubsystemReady()
         {
-            try { return BuildingHelper.GetBuildingRegistration(BuildingHelper.ParseAddressString(address)); }
-            catch { return PlayerBuildings.FirstOrDefault(b => b.Address.ToString() == address); }
+            try { return EmployeeHelper.GetEmployeeInstances().Count > 0; }
+            catch { return false; }
         }
 
-        // ── managers (employees) ────────────────────────────────────────────────
-        /// <summary>Employees at this HQ carrying the manager skill — candidates to run stores.</summary>
         public static List<EmpRef> GetManagerCandidates(string hqAddress)
         {
             var result = new List<EmpRef>();
-            EmployeeInstance[] all;
-            try { all = EmployeeHelper.GetEmployeeInstances().ToArray(); }
+            List<EmployeeInstance> all;
+            try { all = EmployeeHelper.GetEmployeeInstances(); }
             catch { return result; }
 
             foreach (var e in all)
             {
                 if (e == null) continue;
-                bool hasSkill;
-                try { hasSkill = e.HasSkill(ManagerSkill); } catch { hasSkill = false; }
-                if (!hasSkill) continue;
+                if (!Try(() => e.HasSkill(ManagerSkill))) continue;
                 if (e.assignedAddress == null || e.assignedAddress.ToString() != hqAddress) continue;
                 result.Add(ToEmpRef(e));
             }
@@ -127,61 +131,59 @@ namespace StoreManager.Interop
         public static bool HasManagerSkill(string employeeId)
         {
             var e = FindEmployee(employeeId);
-            if (e == null) return false;
-            try { return e.HasSkill(ManagerSkill); } catch { return false; }
+            return e != null && Try(() => e.HasSkill(ManagerSkill));
         }
 
-        public static string HqAddressOf(string employeeId) =>
-            FindEmployee(employeeId)?.assignedAddress?.ToString() ?? string.Empty;
+        public static string HqAddressOf(string employeeId)
+        {
+            var e = FindEmployee(employeeId);
+            try { return e?.assignedAddress?.ToString() ?? ""; } catch { return ""; }
+        }
 
-        public static bool IsScheduledAtHq(string employeeId, string hqAddress)
+        /// <summary>
+        /// null = couldn't determine (game threw); true/false = a real answer. Callers must not
+        /// treat "couldn't determine" as "not scheduled" (that would wrongly dormant a plan).
+        /// </summary>
+        public static bool? IsScheduledAtHq(string employeeId, string hqAddress)
         {
             var e = FindEmployee(employeeId);
             if (e == null) return false;
-            if (e.assignedAddress == null || e.assignedAddress.ToString() != hqAddress) return false;
-            try { return e.IsAssignedToAnyWorkShift(); } catch { return false; }
+            try
+            {
+                if (e.assignedAddress == null || e.assignedAddress.ToString() != hqAddress) return false;
+                return e.IsAssignedToAnyWorkShift();
+            }
+            catch { return null; }
         }
 
-        /// <summary>Dual-binding guard — already bound to a vanilla HQ manager plan?</summary>
         public static bool IsBoundToVanillaPlan(string employeeId)
         {
             try { if (LogisticsManagerHelper.GetAssignedPlanForEmployee(employeeId) != null) return true; } catch { }
             try { if (HrManagerHelper.GetAssignedPlanForHrManager(employeeId) != null) return true; } catch { }
             try { if (PricingManagerHelper.GetAssignedPlanForPricingManager(employeeId) != null) return true; } catch { }
+            try { if (PurchasingAgentHelper.GetAssignedPlanForPurchasingAgent(employeeId) != null) return true; } catch { }
             return false;
         }
 
         public static float GetManagerSkill(string employeeId)
         {
             var e = FindEmployee(employeeId);
-            if (e == null) return 0f;
+            if (e == null || !Try(() => e.HasSkill(ManagerSkill))) return 0f;
             try { return e.GetSkillValue(ManagerSkill); } catch { return 0f; }
         }
 
-        /// <summary>Max stores this manager may supervise — game calc if callable, else the domain fallback.</summary>
-        public static int MaxStores(string hqAddress, string employeeId)
-        {
-            try
-            {
-                var m = typeof(LogisticsManagerPlan).GetMethod("CalculateMaxDestinations",
-                    BindingFlags.Public | BindingFlags.Static, null,
-                    new[] { typeof(Address), typeof(string) }, null);
-                if (m != null)
-                {
-                    var addr = BuildingHelper.ParseAddressString(hqAddress);
-                    var v = m.Invoke(null, new object[] { addr, employeeId });
-                    if (v is int i && i > 0) return i;
-                }
-            }
-            catch { /* fall through */ }
-            return Domain.StoreManagerPlan.MaxStoresForSkill(GetManagerSkill(employeeId));
-        }
+        /// <summary>
+        /// Store cap from the manager's skill. No vanilla helper computes this for a purchasing
+        /// agent (LogisticsManagerPlan.CalculateMaxDestinations is warehouse/logistics-specific),
+        /// so this is the mod's own curve.
+        /// </summary>
+        public static int MaxStores(string hqAddress, string employeeId) =>
+            Domain.StoreManagerPlan.MaxStoresForSkill(GetManagerSkill(employeeId));
 
         public static void OpenEmployeeCard(string employeeId)
         {
             var e = FindEmployee(employeeId);
             if (e == null) return;
-            // OnClickShowEmployee is private static in this build — reach it by reflection (best-effort).
             try
             {
                 var m = typeof(EmployeeHelper).GetMethod("OnClickShowEmployee",
@@ -193,6 +195,7 @@ namespace StoreManager.Interop
 
         private static EmployeeInstance? FindEmployee(string employeeId)
         {
+            if (string.IsNullOrEmpty(employeeId)) return null;
             try { return EmployeeHelper.GetEmployeeById(employeeId, false); }
             catch { return null; }
         }
@@ -200,48 +203,58 @@ namespace StoreManager.Interop
         private static EmpRef ToEmpRef(EmployeeInstance e)
         {
             float skill = 0f; bool sched = false;
-            try { skill = e.GetSkillValue(ManagerSkill); } catch { }
+            try { if (e.HasSkill(ManagerSkill)) skill = e.GetSkillValue(ManagerSkill); } catch { }
             try { sched = e.IsAssignedToAnyWorkShift(); } catch { }
             return new EmpRef(e.id, e.characterData?.name ?? e.id, skill, sched);
         }
 
-        // ── money ───────────────────────────────────────────────────────────────
-        public static bool ChangeMoney(decimal amount, string reasonKey, string? storeAddress = null)
+        // ── persistence: GameInstance.modData primary, save-scoped file fallback (D13) ──
+        private static string? _scopeCache;
+
+        private static string SaveScope()
         {
-            try
-            {
-                var info = new TransactionInfo("storemanager:transaction_restock",
-                    new Dictionary<string, string> { { "reason", reasonKey } });
-                Address? addr = null;
-                if (storeAddress != null) { try { addr = BuildingHelper.ParseAddressString(storeAddress); } catch { } }
-                return GameManager.ChangeMoneySafe((float)amount, info, null, addr, false, false);
-            }
-            catch (Exception e) { Debug.LogError("[StoreManager] ChangeMoney failed: " + e.Message); return false; }
+            if (_scopeCache != null) return _scopeCache;
+            var gi = Save;
+            if (gi == null) return "";                       // unresolvable — caller skips the file write
+            string cid = SafeGet(() => gi.characterId, "") ?? "";
+            string sgn = SafeGet(() => gi.SaveGameName, "") ?? "";
+            var scope = (cid + "_" + sgn).Trim('_');
+            if (scope.Length == 0) return "";
+            _scopeCache = scope;
+            return scope;
         }
 
-        // ── persistence: GameInstance.modData primary, file fallback (D13) ───────
         public static void SaveModData(string key, string json)
         {
-            bool wrote = false;
+            if (string.IsNullOrEmpty(json)) return;          // never persist an empty document
+            bool wroteDict = false;
             try
             {
                 var md = ModDataDict();
-                if (md != null) { md[key] = json; wrote = true; try { SaveGameManager.MarkChange(); } catch { } }
+                if (md != null) { md[key] = json; wroteDict = true; try { SaveGameManager.MarkChange(); } catch { } }
             }
             catch (Exception e) { Debug.LogError("[StoreManager] modData write failed: " + e.Message); }
-            try { ModDataStore.Write(SaveScopedKey(key), json); } catch { }
-            if (!wrote) Debug.LogWarning("[StoreManager] modData unavailable — file sink only.");
+
+            var scope = SaveScope();
+            if (scope.Length > 0)
+                try { ModDataStore.Write(scope + "__" + key, json); } catch { }
+
+            if (!wroteDict) Debug.LogWarning("[StoreManager] GameInstance.modData unavailable — file sink only.");
         }
 
+        /// <summary>modData is authoritative; the file is consulted only when the dict itself is unavailable.</summary>
         public static string? LoadModData(string key)
         {
-            try
-            {
-                var md = ModDataDict();
-                if (md != null && md.TryGetValue(key, out var v) && !string.IsNullOrEmpty(v)) return v;
-            }
+            IDictionary<string, string>? md = null;
+            try { md = ModDataDict(); }
             catch (Exception e) { Debug.LogError("[StoreManager] modData read failed: " + e.Message); }
-            try { return ModDataStore.Read(SaveScopedKey(key)); } catch { return null; }
+
+            if (md != null)
+                return md.TryGetValue(key, out var v) && !string.IsNullOrEmpty(v) ? v : null;
+
+            var scope = SaveScope();
+            if (scope.Length == 0) return null;
+            try { return ModDataStore.Read(scope + "__" + key); } catch { return null; }
         }
 
         private static IDictionary<string, string>? ModDataDict()
@@ -252,36 +265,30 @@ namespace StoreManager.Interop
             return f?.GetValue(gi) as IDictionary<string, string>;
         }
 
-        private static string SaveScopedKey(string key)
-        {
-            string scope = "default";
-            try
-            {
-                var cd = Save?.charactersData;
-                if (cd != null && cd.Count > 0) scope = cd[0].name ?? "default";
-            }
-            catch { }
-            return scope + "__" + key;
-        }
-
         // ── events ──────────────────────────────────────────────────────────────
-        public static void Subscribe(Action onNewDay, Action onSaveGame, Action onJobChange)
+        public static void Subscribe(Action onNewDay, Action onNewHour, Action onSaveGame)
         {
             GlobalEvents.onNewDay = (Action)Delegate.Combine(GlobalEvents.onNewDay, onNewDay);
+            GlobalEvents.onNewHour = (Action)Delegate.Combine(GlobalEvents.onNewHour, onNewHour);
             GlobalEvents.onSaveGame = (Action)Delegate.Combine(GlobalEvents.onSaveGame, onSaveGame);
-            GlobalEvents.onJobChange = (Action)Delegate.Combine(GlobalEvents.onJobChange, onJobChange);
         }
 
-        public static void Unsubscribe(Action onNewDay, Action onSaveGame, Action onJobChange)
+        public static void Unsubscribe(Action onNewDay, Action onNewHour, Action onSaveGame)
         {
             GlobalEvents.onNewDay = (Action)Delegate.Remove(GlobalEvents.onNewDay, onNewDay)!;
+            GlobalEvents.onNewHour = (Action)Delegate.Remove(GlobalEvents.onNewHour, onNewHour)!;
             GlobalEvents.onSaveGame = (Action)Delegate.Remove(GlobalEvents.onSaveGame, onSaveGame)!;
-            GlobalEvents.onJobChange = (Action)Delegate.Remove(GlobalEvents.onJobChange, onJobChange)!;
         }
 
+        // ── util ────────────────────────────────────────────────────────────────
         private static T SafeGet<T>(Func<T> f, T fallback)
         {
             try { return f(); } catch { return fallback; }
+        }
+
+        private static bool Try(Func<bool> f)
+        {
+            try { return f(); } catch { return false; }
         }
     }
 }

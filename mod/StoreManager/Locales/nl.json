@@ -38,5 +38,6 @@
   "storemanager_notify_active": "Filiaalmanager is weer aan het werk",
   "storemanager_notify_restocked": "{store}: leveringsorder aangepast ({count} items, ~${cost}/wk)",
   "storemanager_notify_budget_cap": "{store}: weekbudget voorraad bereikt",
-  "storemanager_notify_weekly_digest": "{manager}: {stores} winkel(s) bevoorraad deze week, ~${spend}"
+  "storemanager_notify_weekly_digest": "{manager}: {stores} winkel(s) bevoorraad deze week, ~${spend}",
+  "storemanager_notify_data_corrupt": "Filiaalmanager: opgeslagen gegevens onleesbaar — deze sessie alleen-lezen (er wordt niets overschreven)"
 }

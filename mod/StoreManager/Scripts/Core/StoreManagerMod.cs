@@ -50,7 +50,7 @@ namespace StoreManager.Core
         public static ManagerDirectory? Active { get; private set; }
 
         private ManagerDirectory? _dir;
-        private Action? _onDay, _onSave, _onJob;
+        private Action? _onDay, _onHour, _onSave;
 
         public string[] RelativeAssetBundlePaths => Array.Empty<string>();
 
@@ -60,18 +60,21 @@ namespace StoreManager.Core
             {
                 _dir = new ManagerDirectory(StoreManagerInitMod.Defaults);
                 Active = _dir;
-                _dir.Load();
+                Guard("Load", () => _dir!.Load());
 
-                _onDay = () => _dir?.OnNewDay();
-                _onSave = () => _dir?.Save();
-                _onJob = () => _dir?.OnJobChange();
-                GameApi.Subscribe(_onDay, _onSave, _onJob);
+                // The game invokes these with a plain ?.Invoke() (no InvokeSafely) — a throw here
+                // would abort the day's tick or wedge the save subsystem. Guard every one.
+                _onDay = () => Guard("onNewDay", () => _dir?.OnNewDay());
+                _onHour = () => Guard("onNewHour", () => _dir?.OnNewHour());
+                _onSave = () => Guard("onSaveGame", () => _dir?.Save());
+                GameApi.Subscribe(_onDay, _onHour, _onSave);
 
                 StoreManagerCommands.Register(_dir);
                 StoreManagerOptions.Rebuild();
 
-                context.Logger.Info($"Store Manager active — {_dir.Plans.Count} plan(s). " +
-                                    "Console: StoreManager.Managers / .Adopt / .Stores / .Assign / .Status / .PlanWeek");
+                context.Logger.Info($"Store Manager active — {_dir.Plans.Count} plan(s)" +
+                                    (_dir.ReadOnly ? " (READ-ONLY — saved data unreadable)" : "") +
+                                    ". Console: StoreManager.Managers / .Adopt / .Stores / .Assign / .Status / .PlanWeek");
             }
             catch (Exception e)
             {
@@ -84,16 +87,22 @@ namespace StoreManager.Core
         {
             try
             {
-                if (_onDay != null && _onSave != null && _onJob != null)
-                    GameApi.Unsubscribe(_onDay, _onSave, _onJob);
+                if (_onDay != null && _onHour != null && _onSave != null)
+                    GameApi.Unsubscribe(_onDay, _onHour, _onSave);
                 StoreManagerCommands.Unregister();
-                _dir?.Detach();
+                Guard("Detach", () => _dir?.Detach());
             }
             catch (Exception e) { Debug.LogError("[StoreManager] unload failed: " + e.Message); }
             _dir = null;
             Active = null;
-            _onDay = _onSave = _onJob = null;
+            _onDay = _onHour = _onSave = null;
             return Task.CompletedTask;
+        }
+
+        private static void Guard(string what, Action a)
+        {
+            try { a(); }
+            catch (Exception e) { Debug.LogError($"[StoreManager] {what} threw (swallowed): {e}"); }
         }
     }
 }

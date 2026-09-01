@@ -55,9 +55,38 @@ namespace StoreManagerProbe
         private IEnumerator Go()
         {
             yield return new WaitForSeconds(6f);
-            Logger?.Info("[SMPROBE] AutoLoad: SaveGameManager.LoadAsync(null, true)");
+
+            // Load the most-advanced save (highest in-game day) — that's the one with an HQ + stores.
+            object? target = null;
+            try
+            {
+                var helper = AppDomain.CurrentDomain.GetAssemblies()
+                    .SelectMany(a => { try { return a.GetTypes(); } catch { return Type.EmptyTypes; } })
+                    .FirstOrDefault(x => x.Name == "SaveGamePathHelper");
+                var m = helper?.GetMethod("GetAllSaveGamesFromVersion",
+                    BindingFlags.Public | BindingFlags.Static);
+                if (m?.Invoke(null, new object?[] { null }) is IEnumerable list)
+                {
+                    int bestDay = -1;
+                    foreach (var s in list)
+                    {
+                        var df = s.GetType().GetField("day", BindingFlags.Public | BindingFlags.Instance);
+                        int day = df?.GetValue(s) is int i ? i : 0;
+                        if (day > bestDay) { bestDay = day; target = s; }
+                    }
+                    Logger?.Info($"[SMPROBE] AutoLoad: chosen save day={bestDay}");
+                }
+            }
+            catch (Exception e) { Logger?.Warn("[SMPROBE] AutoLoad: save enumeration failed: " + e.Message); }
+
             Task<bool>? t = null;
-            try { t = SaveGameManager.LoadAsync(null, true); }
+            try
+            {
+                t = target != null
+                    ? (Task<bool>?)typeof(SaveGameManager).GetMethod("LoadAsync", BindingFlags.Public | BindingFlags.Static,
+                          null, new[] { target.GetType(), typeof(bool) }, null)?.Invoke(null, new object[] { target, true })
+                    : SaveGameManager.LoadAsync(null, true);
+            }
             catch (Exception e) { Logger?.Error(e); yield break; }
             while (t != null && !t.IsCompleted) yield return null;
             Logger?.Info($"[SMPROBE] AutoLoad: completed = {t?.Result}");

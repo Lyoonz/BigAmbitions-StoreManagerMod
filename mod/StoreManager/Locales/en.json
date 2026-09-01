@@ -38,5 +38,6 @@
   "storemanager_notify_active": "Store Manager is back on the job",
   "storemanager_notify_restocked": "{store}: delivery order adjusted ({count} items, ~${cost}/wk)",
   "storemanager_notify_budget_cap": "{store}: hit the weekly restock budget cap",
-  "storemanager_notify_weekly_digest": "{manager}: {stores} store(s) restocked this week, ~${spend}"
+  "storemanager_notify_weekly_digest": "{manager}: {stores} store(s) restocked this week, ~${spend}",
+  "storemanager_notify_data_corrupt": "Store Manager: saved data couldn't be read — running read-only this session (nothing will be overwritten)"
 }

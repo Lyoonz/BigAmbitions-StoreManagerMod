@@ -16,7 +16,9 @@ StuartArmour, Lyoon). Not related to any other repo.
 | **v1** — off-screen data role (git history ≤ commit `e3c47b8`) | superseded by v2 |
 | **v2 design** — `docs/DESIGN-v2.md`, decisions D9–D13 | ✅ locked |
 | **v2 Phase 1** — real hired manager (`ba:skill_purchasingagent`), mod supervision plan in `GameInstance.modData`, assign N stores + per-store limits (console + ModOptions panel), weekly (Saturday) delivery-contract restock within budget, toasts + phone digest, reconcile-on-fire | ✅ **coded, compiles clean (0/0) against the real game (Build 3672)** — NOT yet run in-game |
-| **v2 Phase 2** — multi-store hardening, per-store limits UI polish, optional BizMan HQ-tab spike | ⛔ next |
+| **v2 Phase 2** — per-store limits in the Options→Mods panel (manager dropdown, store toggles, budget/days/staffing sliders), `StoreManager.SelfTest`, multi-store | ✅ coded, compiles 0/0 |
+| **v2 static review** — multi-agent review vs Build 3672 decompile; 19 confirmed bugs (6 save-damage) all fixed — `docs/REVIEW-v2-fixes.md` | ✅ applied, compiles 0/0 |
+| **the one in-game test** | ⛔ next — needs a save with an HQ. `StoreManager.SelfTest` (or the probe) runs it. |
 
 The game **auto-updated Build 3670 → 3672** mid-build. The `dotnet build build/CompileCheck.csproj`
 check compiles against the live DLLs, so it's the source of truth; the decompile in

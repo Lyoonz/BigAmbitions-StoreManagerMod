@@ -186,7 +186,10 @@ namespace StoreManager.Debugging
                 {
                     throwaway = EmployeeHelper.CreateAIEmployeeInstance(GameApi.ManagerSkill);
                     throwaway.characterData.name = "SELFTEST Agent";
-                    throwaway.assignedAddress = BuildingHelper.ParseAddressString(hq);
+                    // set assignedAddress to the live HQ Address object (reflection avoids naming the game type + the buggy string parse)
+                    var addrObj = GameApi.HqAddressObject(hq);
+                    if (addrObj != null)
+                        typeof(EmployeeInstance).GetField("assignedAddress")?.SetValue(throwaway, addrObj);
                     EmployeeHelper.GetEmployeeInstances().Add(throwaway);
                     EmployeeHelper.EmployeeInstancesDictionary[throwaway.id] = throwaway;
                     mgrId = throwaway.id;

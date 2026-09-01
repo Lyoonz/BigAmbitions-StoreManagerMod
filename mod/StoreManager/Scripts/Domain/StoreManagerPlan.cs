@@ -42,8 +42,15 @@ namespace StoreManager.Domain
         /// </summary>
         public bool Dormant;
 
-        /// <summary>Rolling week accumulators for the digest, reset when the digest is sent.</summary>
+        /// <summary>Rolling week accumulators for the digest, reset at the start of each weekly pass.</summary>
         public WeekTally Week = new();
+
+        /// <summary>
+        /// Contracts whose restore was blocked by the Monday delivery lock when a store was
+        /// unassigned / the manager was removed. Drained by Reconcile once the lock lifts, so a
+        /// player's real contract is never left stuck in the mod's tuned state.
+        /// </summary>
+        public List<PendingRestore> PendingRestores = new();
 
         public bool Supervises(string storeAddress) =>
             Assignments.Any(a => a.StoreAddress == storeAddress);
@@ -94,13 +101,12 @@ namespace StoreManager.Domain
         };
     }
 
-    /// <summary>Verbatim snapshot of a game DeliveryContract, for restore-on-detach.</summary>
+    /// <summary>Verbatim snapshot of a game DeliveryContract's mutable state, for restore-on-detach.</summary>
     [Serializable]
     public sealed class ContractSnapshot
     {
         public bool Enabled;
         public bool RepeatingOrder;
-        public string WholesaleAddress = string.Empty;
         public List<ContractLine> Items = new();
 
         [Serializable]
@@ -109,6 +115,15 @@ namespace StoreManager.Domain
             public string ItemName = string.Empty;
             public int Amount;
         }
+    }
+
+    /// <summary>A restore the mod owes the player, deferred past the Monday delivery lock.</summary>
+    [Serializable]
+    public sealed class PendingRestore
+    {
+        public string StoreAddress = string.Empty;
+        public string StoreName = string.Empty;
+        public ContractSnapshot? Snapshot;   // null = disable the contract
     }
 
     /// <summary>Values applied to each new <see cref="StoreAssignment"/>. Editable in the options panel.</summary>
