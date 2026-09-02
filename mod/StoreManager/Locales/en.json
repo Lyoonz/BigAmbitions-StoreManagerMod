@@ -26,7 +26,7 @@
 
   "storemanager_opt_role_disabled": "The Store Manager role is disabled on this game build — supervision is paused and no data is lost. Existing plans load read-only.",
   "storemanager_opt_recruit_hint": "No eligible Store Manager. Recruit one via phone → Recruitment Agency, then schedule them on an HQ desk.",
-  "storemanager_opt_hqtab_hint": "Manage your Store Managers from the \"Store Managers\" BizMan tab at your HQ.",
+  "storemanager_opt_hqtab_hint": "Managed from the HQ \"Store Managers\" tab.",
   "storemanager_opt_notab_hint": "The HQ tab isn't available on this game build — use the controls below.",
   "storemanager_opt_pick_manager": "— pick a manager —",
   "storemanager_opt_manager_label": "Store Manager",

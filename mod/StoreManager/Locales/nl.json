@@ -26,7 +26,7 @@
 
   "storemanager_opt_role_disabled": "De Filiaalmanager-rol is uitgeschakeld op deze game-versie — toezicht is gepauzeerd en er gaat geen data verloren. Bestaande plannen laden alleen-lezen.",
   "storemanager_opt_recruit_hint": "Geen beschikbare filiaalmanager. Werf er een via telefoon → Uitzendbureau en rooster 'm in op een kantoorbureau.",
-  "storemanager_opt_hqtab_hint": "Beheer je filiaalmanagers via het BizMan-tabblad \"Filiaalmanagers\" op je kantoor.",
+  "storemanager_opt_hqtab_hint": "Beheren doe je op het HQ-tabblad \"Filiaalmanagers\".",
   "storemanager_opt_notab_hint": "Het HQ-tabblad is niet beschikbaar op deze game-versie — gebruik de knoppen hieronder.",
   "storemanager_opt_pick_manager": "— kies een manager —",
   "storemanager_opt_manager_label": "Filiaalmanager",

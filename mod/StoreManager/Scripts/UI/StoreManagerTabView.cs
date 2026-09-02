@@ -155,32 +155,33 @@ namespace StoreManager.UI
                 {
                     var assignment = a;
                     var mgrId = plan.ManagerEmployeeId;
-                    var lim = UiKit.Row(_content.transform, false, 10f, 36f);
 
-                    UiKit.FixedWidth(UiKit.Label(lim.transform, "storemanager_bizmantab_budget".L("Weekly budget $"), 12f, UiKit.MutedColor).gameObject, 150f);
-                    UiKit.Stepper(lim.transform, (long)assignment.WeeklyRestockBudgetCap, 500, 0, 10_000_000, 130f, v =>
-                    {
-                        if (v != assignment.WeeklyRestockBudgetCap) { dir.SetCap(mgrId, assignment.StoreAddress, v); Rebuild(); }
-                    });
+                    LimitRow("storemanager_bizmantab_budget".L("Weekly budget $"),
+                        (long)assignment.WeeklyRestockBudgetCap, 500, 0, 10_000_000, v =>
+                        { if (v != assignment.WeeklyRestockBudgetCap) { dir.SetCap(mgrId, assignment.StoreAddress, v); Rebuild(); } });
 
-                    UiKit.FixedWidth(UiKit.Label(lim.transform, "storemanager_bizmantab_days".L("Keep stock for … days"), 12f, UiKit.MutedColor).gameObject, 200f);
-                    UiKit.Stepper(lim.transform, assignment.TargetDaysOfStock, 1, 1, 60, 70f, v =>
-                    {
-                        if (v != assignment.TargetDaysOfStock) { dir.SetTargetDays(mgrId, assignment.StoreAddress, (int)v); Rebuild(); }
-                    });
+                    LimitRow("storemanager_bizmantab_days".L("Keep stock for … days"),
+                        assignment.TargetDaysOfStock, 1, 1, 60, v =>
+                        { if (v != assignment.TargetDaysOfStock) { dir.SetTargetDays(mgrId, assignment.StoreAddress, (int)v); Rebuild(); } });
 
-                    var lim2 = UiKit.Row(_content.transform, false, 10f, 36f);
-                    UiKit.FixedWidth(UiKit.Label(lim2.transform, "storemanager_bizmantab_margin".L("Order extra (%)"), 12f, UiKit.MutedColor).gameObject, 200f);
-                    UiKit.Stepper(lim2.transform, assignment.SafetyMarginPercent, 5, 0, 200, 70f, v =>
-                    {
-                        if (v != assignment.SafetyMarginPercent) { dir.SetSafetyMargin(mgrId, assignment.StoreAddress, (int)v); Rebuild(); }
-                    });
+                    LimitRow("storemanager_bizmantab_margin".L("Order extra (%)"),
+                        assignment.SafetyMarginPercent, 5, 0, 200, v =>
+                        { if (v != assignment.SafetyMarginPercent) { dir.SetSafetyMargin(mgrId, assignment.StoreAddress, (int)v); Rebuild(); } });
 
                     UiKit.Label(_content, "storemanager_bizmantab_dayshelp".L(
                         "\"Keep stock for N days\" is the target; \"Order extra %\" adds a safety margin on top of every order (still capped by the weekly budget)."),
                         11f, UiKit.MutedColor);
                 }
             }
+        }
+
+        /// <summary>One aligned limit row: fixed-width label, then a fixed-layout [− field +] stepper.</summary>
+        private void LimitRow(string label, long value, long step, long min, long max, Action<long> onSet)
+        {
+            if (_content == null) return;
+            var row = UiKit.Row(_content.transform, false, 8f, 36f);
+            UiKit.FixedWidth(UiKit.Label(row.transform, label, 12f, UiKit.MutedColor).gameObject, 230f);
+            UiKit.Stepper(row.transform, value, step, min, max, 120f, onSet);
         }
 
         private static void Announce(ActionResult r)
