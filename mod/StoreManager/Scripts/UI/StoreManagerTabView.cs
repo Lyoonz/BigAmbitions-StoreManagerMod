@@ -28,7 +28,14 @@ namespace StoreManager.UI
             {
                 Build();
                 var rt = (RectTransform)transform;
-                Debug.Log($"[StoreManager] tab view built. container rect={rt.rect.size} content children={(_content != null ? _content.childCount : -1)}");
+                if (_content != null)
+                {
+                    UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(_content);
+                    var first = _content.childCount > 0 ? (RectTransform)_content.GetChild(0) : null;
+                    Debug.Log($"[StoreManager] tab view built. container={rt.rect.size} panel-parent={_content.parent?.name} " +
+                              $"col={_content.rect.size} kids={_content.childCount} firstKid={(first != null ? first.rect.size.ToString() : "n/a")} " +
+                              $"canvas={GetComponentInParent<Canvas>()?.name}");
+                }
             }
             catch (Exception e) { Debug.LogError("[StoreManager] tab view build failed: " + e); }
         }
@@ -41,13 +48,7 @@ namespace StoreManager.UI
         private void Build()
         {
             if (_content == null)
-            {
-                var srGo = UiKit.Container("Scroll", transform);
-                var srt = UiKit.Rect(srGo);
-                srt.anchorMin = Vector2.zero; srt.anchorMax = Vector2.one;
-                srt.offsetMin = Vector2.zero; srt.offsetMax = Vector2.zero;
-                _content = UiKit.ScrollColumn(srGo.transform);
-            }
+                _content = UiKit.Column(transform);
             UiKit.Clear(_content);
 
             UiKit.Label(_content, "storemanager_bizmantab_title".L("Store Managers"), 24f, UiKit.TextColor, FontStyles.Bold);

@@ -50,6 +50,35 @@ namespace StoreManager.UI
             return go;
         }
 
+        /// <summary>A plain full-rect vertical column (no scrolling). Returns the transform to fill.</summary>
+        public static RectTransform Column(Transform parent, float spacing = 8f, int pad = 18)
+        {
+            var go = Container("SM_Panel", parent);
+            var rt = Rect(go);
+            rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+            rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
+            rt.localScale = Vector3.one;
+
+            var bg = go.AddComponent<Image>();
+            bg.color = new Color(0.10f, 0.11f, 0.13f, 0.55f);
+            bg.raycastTarget = false;
+
+            var col = Container("Col", go.transform);
+            var crt = Rect(col);
+            crt.anchorMin = new Vector2(0, 1); crt.anchorMax = new Vector2(1, 1); crt.pivot = new Vector2(0.5f, 1f);
+            crt.offsetMin = new Vector2(0, 0); crt.offsetMax = new Vector2(0, 0);
+
+            var vlg = col.AddComponent<VerticalLayoutGroup>();
+            vlg.spacing = spacing;
+            vlg.padding = new RectOffset(pad, pad, pad, pad);
+            vlg.childControlWidth = true; vlg.childControlHeight = true;
+            vlg.childForceExpandWidth = true; vlg.childForceExpandHeight = false;
+            vlg.childAlignment = TextAnchor.UpperLeft;
+            var fit = col.AddComponent<ContentSizeFitter>();
+            fit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            return crt;
+        }
+
         /// <summary>A vertical scroll view. Returns the Content transform to fill.</summary>
         public static RectTransform ScrollColumn(Transform parent, float spacing = 8f, int pad = 16)
         {
