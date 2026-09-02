@@ -50,6 +50,8 @@ namespace StoreManagerProbe
             var empHelper = FindType("EmployeeHelper");
             if (skillData == null || skillHelper == null) { L("SkillData/SkillHelper type not found — abort"); return; }
 
+            ProbeV3ModIfLoaded(skillHelper, empHelper);
+
             // ── 1. dump vanilla baselines (wage calibration) ────────────────────
             var getData = skillHelper.GetMethod("GetData", new[] { typeof(string) });
             foreach (var vs in new[] { "ba:skill_customerservice", "ba:skill_purchasingagent", "ba:skill_hrmanager", "ba:skill_logisticsmanager" })
@@ -205,6 +207,38 @@ namespace StoreManagerProbe
 
             L("==================== SKILL PROBE END — DO NOT SAVE ====================");
         }
+
+        // ── v3 mod, if deployed alongside the probe: is the custom skill actually live? ──
+        private void ProbeV3ModIfLoaded(Type skillHelper, Type? empHelper)
+        {
+            var boot = FindTypeFull("StoreManager.Interop.Harmony.HarmonyBootstrap");
+            var roleState = FindTypeFull("StoreManager.Runtime.RoleSystemState");
+            var reg = FindTypeFull("StoreManager.Interop.SkillRegistry");
+            if (boot == null && roleState == null) { L("V3: StoreManager v3 mod not loaded — skipping live-skill checks"); return; }
+
+            L("---- V3 LIVE-SKILL CHECKS ----");
+            try { L("V3 HarmonyBootstrap.Patched = " + boot?.GetProperty("Patched")?.GetValue(null)
+                     + "  LastError=" + boot?.GetProperty("LastError")?.GetValue(null)); } catch (Exception e) { L("V3 boot read threw: " + e.Message); }
+            try { L("V3 RoleSystemState.State = " + roleState?.GetProperty("State")?.GetValue(null)
+                     + "  Reason=" + roleState?.GetProperty("Reason")?.GetValue(null)); } catch (Exception e) { L("V3 roleState read threw: " + e.Message); }
+            try { L("V3 SkillRegistry.SkillBuilt=" + reg?.GetProperty("SkillBuilt")?.GetValue(null)
+                     + " InjectedThisSession=" + reg?.GetProperty("InjectedThisSession")?.GetValue(null)
+                     + " IsRegistered=" + reg?.GetMethod("IsRegistered")?.Invoke(null, null)); } catch (Exception e) { L("V3 reg read threw: " + e.Message); }
+
+            var getData = skillHelper.GetMethod("GetData", new[] { typeof(string) });
+            try { L("V3 SkillHelper.GetData(\"sm:skill_storemanager\") = " +
+                    (getData?.Invoke(null, new object[] { "sm:skill_storemanager" }) == null ? "NULL (skill NOT live!)" : "the SkillData")); }
+            catch (Exception e) { L("V3 GetData threw: " + e.Message); }
+
+            var calcWage = empHelper?.GetMethod("CalculateHourlyWageForSkill", new[] { typeof(string), typeof(float) });
+            try { L("V3 wage(sm,20)=" + calcWage?.Invoke(null, new object[] { "sm:skill_storemanager", 20f })
+                     + "  wage(sm,50)=" + calcWage?.Invoke(null, new object[] { "sm:skill_storemanager", 50f }) + "  (target ~30)"); }
+            catch (Exception e) { L("V3 wage threw: " + e.Message); }
+            L("---- end V3 checks ----");
+        }
+
+        private Type? FindTypeFull(string full) => _asms.SelectMany(a => { try { return a.GetTypes(); } catch { return Array.Empty<Type>(); } })
+            .FirstOrDefault(t => t.FullName == full);
 
         // helpers
         private void Probe1(string label, Func<object?> act)
