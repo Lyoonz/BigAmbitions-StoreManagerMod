@@ -41,5 +41,7 @@ temporary dict entry + one in-memory throwaway employee, both dropped before it 
 - **Option 1 — mod-skill primary** (`skills[0] = sm:skill_storemanager`): title shows "Filiaalmanager", but a folder-delete while a manager is hired **can brick the save** (load-time compat-fix NPE). Only safe with a bulletproof `onSaveGame`/`onNewDay` repair that re-skills every `sm:skill_*` employee to `ba:skill_purchasingagent` *before every serialize* — and even then, deleting the folder mid-session before a save is unprotected.
 - **Option 2 — mod-skill secondary** (`skills[0] = ba:skill_purchasingagent`, `skills[1] = sm:skill_storemanager`, plan driven off `HasSkill("sm:skill_storemanager")`): folder-delete is completely safe (primary is vanilla). Title shows **"Purchasing Agent"**. A later Harmony *display* shim on the My Employees row can relabel it without touching data.
 
-**Recommendation: Option 2 for Phase A.** Safe by construction; the title is a cosmetic fast-follow, not a data risk.
+**Recommendation was Option 2. User chose Option 1** (2026-09-02): a mod save-risk is understood
+and accepted, don't over-build around it. → `skills[0] = sm:skill_storemanager`, cheap uninstall
+safety only (`OnUnloadAsync` re-skill + `StoreManager.SafeRemove` + documented procedure). See D15.
 

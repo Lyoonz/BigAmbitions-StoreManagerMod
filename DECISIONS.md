@@ -197,3 +197,40 @@ set their contracts `enabled=false`.
   dormant when unscheduled.
 - **D6** (was: per-store `StoreManagerData` file): now a plan-centric `List<StoreManagerPlan>`
   in `GameInstance.modData` (see D13). The `persistentDataPath` file is demoted to fallback.
+
+## D15 — v3 pivot: two genuinely new native skills; D10 overridden
+
+The user wants **two new hired roles** (`Filiaalmanager` / Store Manager + `Team Leader`), each
+with its own job title, wage rung, and office hire flow — not a reused `ba:skill_purchasingagent`.
+Full research + two adversarial critiques in `docs/research/v3/`; plan in `docs/DESIGN-v3.md`.
+
+**Phase A (first native release) = Store Manager only.** One custom skill
+`sm:skill_storemanager`, built at runtime via `ScriptableObject.CreateInstance<SkillData>()`
+(`secondarySkill = string.Empty`, non-null `associatedColorGradient`, `BuildTagCache()` in
+try/catch), injected via a Harmony **Prefix on `SkillHelper.OnSkillDataLoaded(IList<SkillData>)`**
++ a `[ModEntryOnCityLoad]` backstop, with defense-in-depth Harmony **Postfix on both
+`SkillHelper.GetData` overloads**. The v2 supervision loop is re-parented onto it
+(`GameApi.ManagerSkill` → `sm:skill_storemanager`); drop `ContractSnapshot` / `OriginalContract`
+/ `PendingRestore` (detach = `enabled=false` + toast). No HQ BizMan tab in v1 (highest-risk,
+lowest-value — the Options panel already covers it). Kill-switch `RoleSystemState { Active,
+DegradedPanelOnly, Dormant }` gated on build number `[3672, 3699]` + non-null Harmony handles.
+
+**Skill placement — Option 1 (mod-skill PRIMARY), `skills[0] = sm:skill_storemanager`.**
+The 2026-09-02 probe (`probe/StoreManagerProbe/SKILL-PROBE.md`) confirmed a folder-delete while
+a manager is hired **NPEs vanilla at load** (`CalculateHourlyWageForSkill`,
+`CompatibilityFixesEA03`) — i.e. can brick the save. User's call: *"if you use a mod you accept
+your save can fail — don't weigh this too heavily."* So: primary skill (title shows
+"Filiaalmanager"), **cheap** uninstall safety only — `OnUnloadAsync` re-skills every `sm:skill_*`
+employee to `ba:skill_purchasingagent`, a `StoreManager.SafeRemove` console command does the same
+on demand, and the readme documents "run SafeRemove before deleting the mod folder." **No**
+per-save / per-day rewrite ceremony.
+
+**Wage:** probe showed vanilla manager `baseHourlyWage = 30` with a ~0.5 multiplier on top;
+base 24 landed at $14.79. Phase A uses `baseHourlyWage = 46` (→ ~$30 near skill 20), tunable.
+
+**Deferred (post-v1, only after Phase A survives a game patch):** `sm:skill_teamleader` +
+a 5-field `Department` record + flat pro-rata over-budget trim (drill-down inside the Store
+Manager UI); the one HQ BizMan tab (Harmony Postfix on `BizManBusiness.SetUpTabs`); HQ desk
+`suitableSkills` append; Assistant Manager as an `IsAssistant` flag on a Team Leader (never a
+third skill); skill `icon28` PNG. Still open: do AI rivals own HQ registrations (probe's
+ownership read failed) — gates the deferred `employeePrimarySkills` mutation only.

@@ -63,7 +63,16 @@ skill* + making that skill safe.
   employees, strips the role blobs, prints "safe to delete the mod folder now" — documented as
   THE uninstall procedure.
 
-### The one decision that needs the user — primary vs secondary skill
+### RESOLVED (2026-09-02) — Option 1, mod-skill PRIMARY
+
+Probe (`probe/StoreManagerProbe/SKILL-PROBE.md`) confirmed a folder-delete with a manager hired
+NPEs vanilla at load (can brick the save). User's call: a mod save-risk is understood and
+accepted; don't over-build around it. → **`skills[0] = sm:skill_storemanager`** (title shows
+"Filiaalmanager"), **cheap** uninstall safety only (`OnUnloadAsync` re-skill +
+`StoreManager.SafeRemove` command + documented procedure), no per-save/per-day rewrite.
+`baseHourlyWage = 46`. `BuildTagCache()` + injection + hourly pass all verified safe. See D15.
+
+### (historical) The one decision that needs the user — primary vs secondary skill
 
 The common uninstall is **deleting the mod folder**, which never runs `OnUnloadAsync`. If a hired
 Store Manager's **primary** skill is `sm:skill_storemanager` and the SkillData is then gone,
