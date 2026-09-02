@@ -1,4 +1,4 @@
-# Store Manager (Filiaalmanager) — a Big Ambitions mod
+# Store Manager — a Big Ambitions mod
 
 Adds a **new native employee role: the Store Manager**. Hire one at your Headquarters — through
 the normal Recruitment Agency, just like a Purchasing Agent or HR Manager — and assign them a few
