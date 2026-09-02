@@ -29,20 +29,27 @@ namespace StoreManager.Core
 
         public Task OnLoadAsync(ModContext context)
         {
-            // Load-bearing (D15): the OnSkillDataLoaded prefix must be in place before any save
-            // that holds an sm:skill_* employee is deserialized, or the load-time compat fixes NPE.
-            bool patched = HarmonyBootstrap.EnsurePatched();
-            _ = SkillRegistry.Skill;   // build the SkillData now so BuildTagCache runs early
+            try
+            {
+                // Load-bearing (D15): the OnSkillDataLoaded prefix must be in place before any save
+                // that holds an sm:skill_* employee is deserialized, or the load-time compat fixes NPE.
+                bool patched = HarmonyBootstrap.EnsurePatched();
+                _ = SkillRegistry.Skill;   // build the SkillData now so BuildTagCache runs early
 
-            StoreManagerOptions.Register(context, Defaults);
-            context.Logger.Info($"Store Manager loaded (v3). Harmony patched={patched}. Panel: Options → Mods.");
+                StoreManagerOptions.Register(context, Defaults);
+                context.Logger.Info($"Store Manager loaded (v3). Harmony patched={patched}. Panel: Options → Mods.");
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("[StoreManager] init-load failed (mod will be inert): " + e);
+            }
             return Task.CompletedTask;
         }
 
         public Task OnUnloadAsync()
         {
-            StoreManagerOptions.Unregister();
-            HarmonyBootstrap.Unpatch();
+            try { StoreManagerOptions.Unregister(); } catch (Exception e) { Debug.LogWarning("[StoreManager] options unregister: " + e.Message); }
+            try { HarmonyBootstrap.Unpatch(); } catch (Exception e) { Debug.LogWarning("[StoreManager] unpatch: " + e.Message); }
             return Task.CompletedTask;
         }
     }

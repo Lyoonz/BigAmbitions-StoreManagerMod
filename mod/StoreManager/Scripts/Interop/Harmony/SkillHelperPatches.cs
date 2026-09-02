@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
 using HarmonyLib;
 using UnityEngine;
@@ -18,6 +19,9 @@ namespace StoreManager.Interop.Harmony
     ///
     /// <para><b>Postfix on both <c>GetData</c> overloads</b> is defence in depth: any residual miss
     /// returns the cached SkillData instead of null.</para>
+    ///
+    /// <para>Every patch body is fully swallowed — a throwing prefix/postfix would break the game's
+    /// own skill loading, which is far worse than the mod silently not working.</para>
     /// </summary>
     public static class SkillHelperPatches
     {
@@ -29,15 +33,19 @@ namespace StoreManager.Interop.Harmony
         {
             private static void Prefix(IList<SkillData> skillData)
             {
-                OnSkillDataLoadedPatched = true;
-                SkillRegistry.AddToLoadList(skillData);
+                try
+                {
+                    OnSkillDataLoadedPatched = true;
+                    SkillRegistry.AddToLoadList(skillData);
+                }
+                catch (Exception e) { Debug.LogError("[StoreManager] OnSkillDataLoaded prefix swallowed: " + e); }
             }
 
-            // Belt: if the game ever changes OnSkillDataLoaded to not iterate the list we passed,
-            // the postfix still forces the entry in.
+            // Belt: force the entry into the freshly-rebuilt dictionary regardless of the list path.
             private static void Postfix()
             {
-                SkillRegistry.EnsureInjected();
+                try { SkillRegistry.EnsureInjected(); }
+                catch (Exception e) { Debug.LogError("[StoreManager] OnSkillDataLoaded postfix swallowed: " + e); }
             }
         }
 
@@ -46,10 +54,14 @@ namespace StoreManager.Interop.Harmony
         {
             private static void Postfix(string skillName, ref SkillData __result)
             {
-                GetDataPatched = true;
-                var mod = SkillRegistry.Skill;
-                if (__result == null && mod != null && skillName == SkillRegistry.StoreManagerSkill)
-                    __result = mod;
+                try
+                {
+                    GetDataPatched = true;
+                    var mod = SkillRegistry.Skill;
+                    if (__result == null && mod != null && skillName == SkillRegistry.StoreManagerSkill)
+                        __result = mod;
+                }
+                catch (Exception e) { Debug.LogError("[StoreManager] GetData(string) postfix swallowed: " + e); }
             }
         }
 
@@ -58,9 +70,13 @@ namespace StoreManager.Interop.Harmony
         {
             private static void Postfix(Skill skill, ref SkillData __result)
             {
-                var mod = SkillRegistry.Skill;
-                if (__result == null && mod != null && skill.name == SkillRegistry.StoreManagerSkill)
-                    __result = mod;
+                try
+                {
+                    var mod = SkillRegistry.Skill;
+                    if (__result == null && mod != null && skill.name == SkillRegistry.StoreManagerSkill)
+                        __result = mod;
+                }
+                catch (Exception e) { Debug.LogError("[StoreManager] GetData(Skill) postfix swallowed: " + e); }
             }
         }
     }
