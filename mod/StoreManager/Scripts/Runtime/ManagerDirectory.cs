@@ -96,16 +96,18 @@ namespace StoreManager.Runtime
         public ActionResult AdoptManager(string hqAddress, string employeeId, bool skipScheduleCheck)
         {
             if (_readOnly) return ActionResult.No("store-manager data is in read-only mode this session");
+            if (!RoleSystemState.IsActive)
+                return ActionResult.No("the Store Manager role is disabled on this game build — " + RoleSystemState.Reason);
             if (_plans.Any(p => p.ManagerEmployeeId == employeeId))
                 return ActionResult.No("that employee is already a Store Manager");
             if (!GameApi.EmployeeExists(employeeId))
                 return ActionResult.No("employee not found");
             if (!GameApi.HasManagerSkill(employeeId))
-                return ActionResult.No("employee doesn't have the Purchasing Agent skill");
+                return ActionResult.No("that employee isn't a Store Manager (missing the sm:skill_storemanager skill)");
             if (GameApi.IsBoundToVanillaPlan(employeeId))
                 return ActionResult.No("that employee already runs an HR / Logistics / Pricing / Purchasing plan at the office");
-            if (!skipScheduleCheck && GameApi.IsScheduledAtHq(employeeId, hqAddress) != true)
-                return ActionResult.No("schedule the manager on an HQ desk first (BizMan → HQ → Schedule)");
+            if (!skipScheduleCheck && GameApi.IsManagerOnDuty(employeeId, hqAddress) != true)
+                return ActionResult.No("assign the manager to the HQ first (My Employees → the manager → assign to your Headquarters)");
 
             var m = GameApi.FindManager(employeeId);
             var plan = new StoreManagerPlan { ManagerEmployeeId = employeeId, HqAddress = hqAddress };
@@ -256,8 +258,8 @@ namespace StoreManager.Runtime
                     continue;
                 }
 
-                // scheduled? null = couldn't tell -> keep the previous Dormant state
-                var scheduled = GameApi.IsScheduledAtHq(plan.ManagerEmployeeId, plan.HqAddress);
+                // on duty? null = couldn't tell -> keep the previous Dormant state
+                var scheduled = GameApi.IsManagerOnDuty(plan.ManagerEmployeeId, plan.HqAddress);
                 if (scheduled == false && !plan.Dormant)
                 {
                     plan.Dormant = true; dirty = true;

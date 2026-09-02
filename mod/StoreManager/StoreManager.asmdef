@@ -40,7 +40,8 @@
     "OdinSerializer.dll",
     "System.Runtime.CompilerServices.Unsafe.dll",
     "UnityUIExtensions.dll",
-    "NaughtyAttributes.Core.dll"
+    "NaughtyAttributes.Core.dll",
+    "0Harmony.dll"
   ],
   "autoReferenced": false,
   "defineConstraints": [

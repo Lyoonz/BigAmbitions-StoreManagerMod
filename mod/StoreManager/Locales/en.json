@@ -2,15 +2,21 @@
   "storemanager_options_header": "Store Manager",
   "storemanager_contact_description": "Store Manager — weekly reports and delivery alerts.",
 
+  "sm:skill_storemanager": "Store Manager",
+
   "storemanager_act_label": "Quick actions",
   "storemanager_act_pick": "— choose an action —",
+  "storemanager_act_recruit": "Hire a new Store Manager onto my HQ",
   "storemanager_act_selftest": "Run self-test (checks the whole loop, changes nothing)",
   "storemanager_act_status": "Show status",
   "storemanager_act_planweek": "Run the weekly restock pass now",
+  "storemanager_act_saferemove": "Safe uninstall — re-skill managers to Purchasing Agent",
 
   "storemanager_opt_no_city": "Load a save to manage stores.",
   "storemanager_opt_no_hq": "Rent an office (Headquarters) first — the manager works from there.",
-  "storemanager_opt_no_candidates": "No Purchasing Agent at your office yet. Recruit one, hire them, assign to your HQ and give them a shift — then they'll appear here. (The self-test above works without one.)",
+  "storemanager_opt_role_disabled": "The Store Manager role is disabled on this game build — supervision is paused and no data is lost. Existing plans load read-only.",
+  "storemanager_opt_recruit_hint": "No Store Manager yet. Use \"Hire a new Store Manager onto my HQ\" above, then schedule them on an HQ desk and pick them below.",
+  "storemanager_opt_no_candidates": "No Store Manager at your office yet. Hire one with the quick action above, assign them to your HQ and give them a shift — then they'll appear here.",
   "storemanager_opt_pick_manager": "— pick a manager —",
   "storemanager_opt_manager_label": "Store Manager",
   "storemanager_opt_stores_header": "Manager & supervised stores",
@@ -38,10 +44,12 @@
   "storemanager_notify_store_unassigned": "Store Manager stopped supervising {store}",
   "storemanager_notify_store_lost": "{store} left the manager's plan (no longer owned)",
   "storemanager_notify_manager_gone": "Your Store Manager is gone — their stores were released",
-  "storemanager_notify_dormant": "Store Manager is idle — schedule them at the HQ to activate their plan",
+  "storemanager_notify_dormant": "Store Manager is idle — assign them to your HQ to activate their plan",
   "storemanager_notify_active": "Store Manager is back on the job",
   "storemanager_notify_restocked": "{store}: delivery order adjusted ({count} items, ~${cost}/wk)",
   "storemanager_notify_budget_cap": "{store}: hit the weekly restock budget cap",
   "storemanager_notify_weekly_digest": "{manager}: {stores} store(s) restocked this week, ~${spend}",
-  "storemanager_notify_data_corrupt": "Store Manager: saved data couldn't be read — running read-only this session (nothing will be overwritten)"
+  "storemanager_notify_data_corrupt": "Store Manager: saved data couldn't be read — running read-only this session (nothing will be overwritten)",
+  "storemanager_notify_role_disabled": "Store Manager role disabled on this game build — supervision paused, no data lost",
+  "storemanager_msg_role_disabled": "The Store Manager custom skill isn't safe on this game build ({reason}). Supervision is paused and existing plans load read-only — nothing is lost. If you're about to delete the mod, run \"Safe uninstall\" first."
 }

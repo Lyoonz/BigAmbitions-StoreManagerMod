@@ -30,6 +30,8 @@ namespace StoreManager.Debugging
         private static readonly Action _status = Status;
         private static readonly Action _planWeek = PlanWeek;
         private static readonly Action _selfTest = SelfTest;
+        private static readonly Action _recruit = Recruit;
+        private static readonly Action _safeRemove = SafeRemove;
 
         public static void Register(ManagerDirectory dir)
         {
@@ -45,12 +47,16 @@ namespace StoreManager.Debugging
             CommandHelper.AddCommand("StoreManager.Status", "Print plan status.", _status);
             CommandHelper.AddCommand("StoreManager.PlanWeek", "Force the weekly restock pass now (test).", _planWeek);
             CommandHelper.AddCommand("StoreManager.SelfTest",
-                "End-to-end: inject a Purchasing Agent, adopt, assign a store with a contract, run the weekly pass, log before/after, undo. DO NOT SAVE after.", _selfTest);
+                "End-to-end: inject a manager, adopt, assign a store with a contract, run the weekly pass, log before/after, undo. DO NOT SAVE after.", _selfTest);
+            CommandHelper.AddCommand("StoreManager.Recruit",
+                "Hire a new Store Manager onto your HQ (custom skill). Then schedule + adopt them.", _recruit);
+            CommandHelper.AddCommand("StoreManager.SafeRemove",
+                "Uninstall prep: re-skill every Store Manager to Purchasing Agent and drop all plans, so deleting the mod folder is safe.", _safeRemove);
         }
 
         public static void Unregister()
         {
-            foreach (var d in new Delegate[] { _managers, _adopt, _drop, _stores, _assign, _unassign, _setCap, _days, _status, _planWeek, _selfTest })
+            foreach (var d in new Delegate[] { _managers, _adopt, _drop, _stores, _assign, _unassign, _setCap, _days, _status, _planWeek, _selfTest, _recruit, _safeRemove })
                 try { CommandHelper.RemoveCommand(d); } catch { }
             _dir = null;
         }
@@ -68,7 +74,30 @@ namespace StoreManager.Debugging
             var cands = GameApi.GetManagerCandidates(hq);
             Log($"eligible managers at HQ ({cands.Count}):");
             for (int i = 0; i < cands.Count; i++) Log($"  {i}: {cands[i]}");
-            if (cands.Count == 0) Log("  (recruit a Purchasing Agent, hire them, assign to the HQ, and schedule them)");
+            if (cands.Count == 0) Log("  (run StoreManager.Recruit to hire one, then schedule them on an HQ desk)");
+        }
+
+        private static void Recruit()
+        {
+            if (!RoleSystemState.IsActive) { Log("role disabled: " + RoleSystemState.Reason); return; }
+            var hq = Hq();
+            if (string.IsNullOrEmpty(hq)) { Log("no HQ found — rent an office first"); return; }
+            var r = RoleEmployees.Recruit(hq);
+            Log((r.Ok ? "" : "failed: ") + r.Message);
+            StoreManager.UI.StoreManagerOptions.Rebuild();
+        }
+
+        private static void SafeRemove()
+        {
+            int reskilled = RoleEmployees.ReskillAllToVanilla();
+            int dropped = 0;
+            if (_dir != null)
+                foreach (var p in _dir.Plans.ToList().Select(p => p.ManagerEmployeeId).ToList())
+                { _dir.DropManager(p); dropped++; }
+            _dir?.Save();
+            Log($"SafeRemove: re-skilled {reskilled} manager(s) to {RoleEmployees.VanillaFallback}, dropped {dropped} plan(s). " +
+                "Save the game now, then it's safe to delete the mod folder.");
+            StoreManager.UI.StoreManagerOptions.Rebuild();
         }
 
         private static void Adopt(int n)
@@ -143,6 +172,7 @@ namespace StoreManager.Debugging
 
         private static void Status()
         {
+            Log(RoleSystemState.Summary());
             Log(StatusSummary());
             if (_dir == null) return;
             foreach (var p in _dir.Plans)
@@ -203,6 +233,11 @@ namespace StoreManager.Debugging
         public static string SelfTestCore()
         {
             if (_dir == null) { Log("SelfTest: no city loaded"); return "FAIL: no city loaded"; }
+            if (!RoleSystemState.IsActive)
+            {
+                Log("SelfTest: role system disabled — " + RoleSystemState.Reason);
+                return "FAIL: Store Manager role disabled on this build (" + RoleSystemState.Reason + ")";
+            }
 
             var stores = GameApi.GetSupervisableStores();
             int withContract = stores.Count(s => DeliveryContracts.HasContract(s.Address));

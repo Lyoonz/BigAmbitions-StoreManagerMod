@@ -2,15 +2,21 @@
   "storemanager_options_header": "Filiaalmanager",
   "storemanager_contact_description": "Filiaalmanager — weekrapporten en leveringsmeldingen.",
 
+  "sm:skill_storemanager": "Filiaalmanager",
+
   "storemanager_act_label": "Snelle acties",
   "storemanager_act_pick": "— kies een actie —",
+  "storemanager_act_recruit": "Nieuwe filiaalmanager inhuren op mijn kantoor",
   "storemanager_act_selftest": "Zelftest uitvoeren (checkt de hele loop, verandert niets)",
   "storemanager_act_status": "Status tonen",
   "storemanager_act_planweek": "Nu de wekelijkse voorraadronde uitvoeren",
+  "storemanager_act_saferemove": "Veilig verwijderen — managers terug naar Purchasing Agent",
 
   "storemanager_opt_no_city": "Laad een save om winkels te beheren.",
   "storemanager_opt_no_hq": "Huur eerst een kantoor (Headquarters) — de manager werkt daarvandaan.",
-  "storemanager_opt_no_candidates": "Nog geen Purchasing Agent op je kantoor. Werf er een, huur 'm in, wijs 'm toe aan je kantoor en geef 'm een dienst — dan verschijnt-ie hier. (De zelftest hierboven werkt ook zonder.)",
+  "storemanager_opt_role_disabled": "De Filiaalmanager-rol is uitgeschakeld op deze game-versie — toezicht is gepauzeerd en er gaat geen data verloren. Bestaande plannen laden alleen-lezen.",
+  "storemanager_opt_recruit_hint": "Nog geen filiaalmanager. Gebruik \"Nieuwe filiaalmanager inhuren op mijn kantoor\" hierboven, rooster 'm daarna in op een kantoorplek en kies 'm hieronder.",
+  "storemanager_opt_no_candidates": "Nog geen filiaalmanager op je kantoor. Huur er een via de snelle actie hierboven, wijs 'm toe aan je kantoor en geef 'm een dienst — dan verschijnt-ie hier.",
   "storemanager_opt_pick_manager": "— kies een manager —",
   "storemanager_opt_manager_label": "Filiaalmanager",
   "storemanager_opt_stores_header": "Manager & winkels onder toezicht",
@@ -38,10 +44,12 @@
   "storemanager_notify_store_unassigned": "Filiaalmanager stopt met toezicht op {store}",
   "storemanager_notify_store_lost": "{store} is uit het plan van de manager (niet meer in bezit)",
   "storemanager_notify_manager_gone": "Je filiaalmanager is weg — zijn winkels zijn vrijgegeven",
-  "storemanager_notify_dormant": "Filiaalmanager is inactief — rooster 'm in op het kantoor om het plan te activeren",
+  "storemanager_notify_dormant": "Filiaalmanager is inactief — wijs 'm toe aan je kantoor om het plan te activeren",
   "storemanager_notify_active": "Filiaalmanager is weer aan het werk",
   "storemanager_notify_restocked": "{store}: leveringsorder aangepast ({count} items, ~${cost}/wk)",
   "storemanager_notify_budget_cap": "{store}: weekbudget voorraad bereikt",
   "storemanager_notify_weekly_digest": "{manager}: {stores} winkel(s) bevoorraad deze week, ~${spend}",
-  "storemanager_notify_data_corrupt": "Filiaalmanager: opgeslagen gegevens onleesbaar — deze sessie alleen-lezen (er wordt niets overschreven)"
+  "storemanager_notify_data_corrupt": "Filiaalmanager: opgeslagen gegevens onleesbaar — deze sessie alleen-lezen (er wordt niets overschreven)",
+  "storemanager_notify_role_disabled": "Filiaalmanager-rol uitgeschakeld op deze game-versie — toezicht gepauzeerd, geen data verloren",
+  "storemanager_msg_role_disabled": "De eigen Filiaalmanager-skill is niet veilig op deze game-versie ({reason}). Toezicht is gepauzeerd en bestaande plannen laden alleen-lezen — er gaat niets verloren. Ga je de mod verwijderen? Draai dan eerst \"Veilig verwijderen\"."
 }

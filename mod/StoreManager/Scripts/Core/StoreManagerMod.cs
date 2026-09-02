@@ -5,6 +5,7 @@ using BAModAPI;
 using StoreManager.Debugging;
 using StoreManager.Domain;
 using StoreManager.Interop;
+using StoreManager.Interop.Harmony;
 using StoreManager.Runtime;
 using StoreManager.UI;
 using UnityEngine;
@@ -15,7 +16,8 @@ using UnityEngine;
 namespace StoreManager.Core
 {
     /// <summary>
-    /// Init-load entry: the global defaults + the Options → Mods panel. Session-wide.
+    /// Init-load entry (session-wide, fires once): Harmony patching + the custom skill build, plus
+    /// the global defaults and the Options → Mods panel.
     /// </summary>
     [ModEntryOnInitializationLoad]
     public sealed class StoreManagerInitMod : IModBigAmbitions
@@ -27,21 +29,30 @@ namespace StoreManager.Core
 
         public Task OnLoadAsync(ModContext context)
         {
+            // Load-bearing (D15): the OnSkillDataLoaded prefix must be in place before any save
+            // that holds an sm:skill_* employee is deserialized, or the load-time compat fixes NPE.
+            bool patched = HarmonyBootstrap.EnsurePatched();
+            _ = SkillRegistry.Skill;   // build the SkillData now so BuildTagCache runs early
+
             StoreManagerOptions.Register(context, Defaults);
-            context.Logger.Info("Store Manager loaded (v2). Panel: Options → Mods. Console: StoreManager.*");
+            context.Logger.Info($"Store Manager loaded (v3). Harmony patched={patched}. Panel: Options → Mods.");
             return Task.CompletedTask;
         }
 
         public Task OnUnloadAsync()
         {
             StoreManagerOptions.Unregister();
+            HarmonyBootstrap.Unpatch();
             return Task.CompletedTask;
         }
     }
 
     /// <summary>
-    /// City-load entry: the supervision directory, wired to the game's day/save/job events.
-    /// Torn down cleanly on unload (modData entry is left in place — re-adopted on reinstall).
+    /// City-load entry: re-inject the skill (backstop), run the role-system self-check, then bring
+    /// up the supervision directory wired to the game's day/save events. Torn down cleanly on
+    /// unload — the modData entry is left in place. No re-skilling here (this fires on every city
+    /// exit, not just uninstall); uninstall safety is the SafeRemove command + the degraded
+    /// onSaveGame guard.
     /// </summary>
     [ModEntryOnCityLoad]
     public sealed class StoreManagerCityMod : IModBigAmbitions
@@ -58,6 +69,9 @@ namespace StoreManager.Core
         {
             try
             {
+                SkillRegistry.EnsureInjected();      // backstop — the Harmony prefix is primary
+                RoleSystemState.Evaluate();
+
                 _dir = new ManagerDirectory(StoreManagerInitMod.Defaults);
                 Active = _dir;
                 Guard("Load", () => _dir!.Load());
@@ -66,7 +80,7 @@ namespace StoreManager.Core
                 // would abort the day's tick or wedge the save subsystem. Guard every one.
                 _onDay = () => Guard("onNewDay", () => _dir?.OnNewDay());
                 _onHour = () => Guard("onNewHour", () => _dir?.OnNewHour());
-                _onSave = () => Guard("onSaveGame", () => _dir?.Save());
+                _onSave = () => Guard("onSaveGame", OnSaveGame);
                 GameApi.Subscribe(_onDay, _onHour, _onSave);
 
                 StoreManagerCommands.Register(_dir);
@@ -74,13 +88,28 @@ namespace StoreManager.Core
 
                 context.Logger.Info($"Store Manager active — {_dir.Plans.Count} plan(s)" +
                                     (_dir.ReadOnly ? " (READ-ONLY — saved data unreadable)" : "") +
-                                    ". Console: StoreManager.Managers / .Adopt / .Stores / .Assign / .Status / .PlanWeek");
+                                    $" — {RoleSystemState.Summary()}");
             }
             catch (Exception e)
             {
                 Debug.LogError("[StoreManager] city-load failed: " + e);
             }
             return Task.CompletedTask;
+        }
+
+        private void OnSaveGame()
+        {
+            // A degraded session must not leave an orphan primary skill in the save file.
+            if (!RoleSystemState.IsActive)
+            {
+                try
+                {
+                    int n = RoleEmployees.ReskillAllToVanilla();
+                    if (n > 0) Debug.LogWarning($"[StoreManager] role disabled — re-skilled {n} manager(s) to vanilla before save.");
+                }
+                catch (Exception e) { Debug.LogError("[StoreManager] pre-save re-skill failed: " + e.Message); }
+            }
+            _dir?.Save();
         }
 
         public Task OnUnloadAsync()

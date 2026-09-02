@@ -20,8 +20,17 @@ namespace StoreManager.Interop
     /// </summary>
     public static class GameApi
     {
-        public const string ManagerSkill = "ba:skill_purchasingagent";   // D10
+        /// <summary>The custom skill a Store Manager carries (D15 — was <c>ba:skill_purchasingagent</c> under D10).</summary>
+        public const string ManagerSkill = SkillRegistry.StoreManagerSkill;
         public const string HqBusinessType = "ba:businesstype_headquarters";
+
+        /// <summary>
+        /// v1: <c>sm:skill_storemanager</c> is not yet in the HQ desks' <c>suitableSkills</c>
+        /// (deferred), so the game won't let the player put a Store Manager on an HQ desk shift.
+        /// Until that injection ships, the plan is active whenever the manager is simply *assigned*
+        /// to the HQ. Flip to true once desks accept the skill.
+        /// </summary>
+        public static readonly bool RequireHqShift = false;
         private const string EmptyBusinessType = "ba:businesstype_empty";
 
         public readonly struct Ref
@@ -159,6 +168,23 @@ namespace StoreManager.Interop
             {
                 if (e.assignedAddress == null || e.assignedAddress.ToString() != hqAddress) return false;
                 return e.IsAssignedToAnyWorkShift();
+            }
+            catch { return null; }
+        }
+
+        /// <summary>
+        /// Whether the manager should be considered "on the job" for their plan. v1: assigned to
+        /// the HQ is enough (<see cref="RequireHqShift"/>); later this also requires an HQ shift.
+        /// null = couldn't determine (don't flip Dormant on that).
+        /// </summary>
+        public static bool? IsManagerOnDuty(string employeeId, string hqAddress)
+        {
+            if (RequireHqShift) return IsScheduledAtHq(employeeId, hqAddress);
+            var e = FindEmployee(employeeId);
+            if (e == null) return false;
+            try
+            {
+                return e.assignedAddress != null && e.assignedAddress.ToString() == hqAddress;
             }
             catch { return null; }
         }

@@ -78,7 +78,8 @@ namespace StoreManager.UI
         // ── actions ────────────────────────────────────────────────────────────
         private static readonly string[] ActionChoices =
         {
-            "storemanager_act_pick", "storemanager_act_selftest", "storemanager_act_status", "storemanager_act_planweek",
+            "storemanager_act_pick", "storemanager_act_recruit", "storemanager_act_selftest",
+            "storemanager_act_status", "storemanager_act_planweek", "storemanager_act_saferemove",
         };
 
         private static void AddActions(ModOptions o)
@@ -89,13 +90,38 @@ namespace StoreManager.UI
                 var dir = Core.StoreManagerCityMod.Active;
                 switch (i)
                 {
-                    case 1: Debugging.StoreManagerCommands.SelfTestFromPanel(); break;
-                    case 2: Feedback.Toast(Feedback.Level.Info, "storemanager_notify_ok",
+                    case 1: // recruit
+                    {
+                        var hq = GameApi.GetHeadquarters().FirstOrDefault();
+                        if (!RoleSystemState.IsActive)
+                            Feedback.Toast(Feedback.Level.Warning, "storemanager_notify_blocked", D("msg", RoleSystemState.Reason));
+                        else if (string.IsNullOrEmpty(hq.Address))
+                            Feedback.Toast(Feedback.Level.Warning, "storemanager_notify_blocked", D("msg", "rent an office (HQ) first"));
+                        else
+                        {
+                            var r = RoleEmployees.Recruit(hq.Address);
+                            Feedback.Toast(r.Ok ? Feedback.Level.Success : Feedback.Level.Warning,
+                                r.Ok ? "storemanager_notify_ok" : "storemanager_notify_blocked", D("msg", r.Message));
+                        }
+                        break;
+                    }
+                    case 2: Debugging.StoreManagerCommands.SelfTestFromPanel(); break;
+                    case 3: Feedback.Toast(Feedback.Level.Info, "storemanager_notify_ok",
                                 D("msg", Debugging.StoreManagerCommands.StatusSummary())); break;
-                    case 3:
+                    case 4:
                         if (dir != null && dir.Plans.Count > 0) dir.RunWeeklyPlanning();
                         else Feedback.Toast(Feedback.Level.Warning, "storemanager_notify_blocked", D("msg", "no Store Manager to run"));
                         break;
+                    case 5: // safe uninstall
+                    {
+                        int n = RoleEmployees.ReskillAllToVanilla();
+                        if (dir != null)
+                            foreach (var id in dir.Plans.Select(p => p.ManagerEmployeeId).ToList()) dir.DropManager(id);
+                        dir?.Save();
+                        Feedback.Toast(Feedback.Level.Info, "storemanager_notify_ok",
+                            D("msg", $"Re-skilled {n} manager(s) to Purchasing Agent, dropped all plans. Save now, then deleting the mod is safe."));
+                        break;
+                    }
                 }
                 RequestRebuild();   // fresh id -> dropdown returns to "— choose —"
             });
@@ -105,6 +131,9 @@ namespace StoreManager.UI
         private static void BuildBody(ModOptions o)
         {
             AddActions(o);
+
+            if (!RoleSystemState.IsActive)
+                o.AddHeader("storemanager_opt_role_disabled");
 
             var dir = Core.StoreManagerCityMod.Active;
             if (dir == null) { o.AddHeader("storemanager_opt_no_city"); AddDefaults(o); return; }
@@ -116,7 +145,7 @@ namespace StoreManager.UI
             var cands = GameApi.GetManagerCandidates(hq.Address);
             var plan = dir.Plans.FirstOrDefault();
 
-            if (cands.Count == 0 && plan == null) { o.AddHeader("storemanager_opt_no_candidates"); AddDefaults(o); return; }
+            if (cands.Count == 0 && plan == null) { o.AddHeader("storemanager_opt_recruit_hint"); AddDefaults(o); return; }
 
             // ── manager picker ─────────────────────────────────────────────────
             o.AddSplitter().AddHeader("storemanager_opt_stores_header");
