@@ -37,3 +37,4 @@ build/obj/
 
 # Regenerated decompile (licensed game content — never commit)
 _decomp/
+dist/

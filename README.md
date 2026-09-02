@@ -1,69 +1,87 @@
-# Store Manager Mod — Big Ambitions
+# Store Manager (Filiaalmanager) — a Big Ambitions mod
 
-Hire a **Manager** or **Assistant Manager** for a store; they run its day-to-day operations
-(schedule, stock, sick/holiday, complaints, training) so the business keeps running while
-you focus elsewhere. Plus: schedule *yourself* into a store roster, and get released from a
-station automatically when a scheduled employee clocks in.
+Adds a **new native employee role: the Store Manager**. Hire one at your Headquarters — through
+the normal Recruitment Agency, just like a Purchasing Agent or HR Manager — and assign them a few
+of your shops. Each week they top up those shops' **wholesale delivery contracts** to keep the
+shelves stocked, staying inside a weekly budget you set.
 
-Full design: see the design brief and the Phase 0 runbook (links in `DECISIONS.md`).
+It behaves like a first-party HQ role: its own skill, its own wage (~$28–40/h scaling with skill),
+its own **"Store Managers" tab** in the BizMan HQ screen, and a counter on the HQ card.
 
-> **v2 in progress.** The manager is being rebuilt as a real hired employee
-> (`ba:skill_purchasingagent`) recruited/scheduled through the vanilla UI, with a mod
-> supervision plan (assign N stores, per-store limits, weekly delivery-contract restock,
-> visible feedback). Phase 1 is coded and compiles clean against the game; see
-> [`CONTINUE.md`](CONTINUE.md) and [`docs/DESIGN-v2.md`](docs/DESIGN-v2.md). The status
-> table below describes the earlier v1.
+> Status: **first public test build (v0.1.0).** The Store Manager role is complete. A second role
+> (Team Leader / departments) is planned. Feedback very welcome — see the bottom of this file.
 
-## Status
+---
 
-| Part | State |
-|------|-------|
-| Design brief | ✅ complete (artifact) |
-| Toolchain decision | ✅ locked — official SDK (`BAModAPI`), see `DECISIONS.md` |
-| Domain model (skill, mistakes, policy, difficulty, wages) | ✅ implemented — pure C#, no game deps |
-| SDK entry points / manifest / asmdef | ✅ scaffolded against the real SDK API |
-| **Phase 0** | ✅ **done** — decompiled the game, mapped every type, mod compiles + **runs in the real game** (Build 3670), all SDK hooks fire, all read bindings verified live (`REPORT.md`). Verdict: **GO** |
-| Game bindings (`Interop/GameBindings.cs`) | ✅ real implementations; ~10 `// VERIFY` notes (field names / wholesale path / one behavioural check) |
-| Build & deploy | ✅ `dotnet` (net472) → `build/deploy-local.sh`. **No Unity needed** — local mods just need one DLL in `ModsLocal/<name>/` |
-| Restock write-path (`DeliveryContract`) | ✅ verified in-game — item-amount write recomputes cost |
-| **Phase 1 hiring entry point** | ✅ debug-console commands (`StoreManager.Hire/.Status/.RunDay/.RunWeek`) — register in the real game with no error. Real UI is later polish. |
-| Task/shift write-path check | ⏳ needs a save with hired employees (test save had 0 staff anywhere) |
-| Phase 1: playtest & balance the numbers | ⛔ needs human gameplay on a staffed save |
+## Install
 
-**Try it:** `bash build/deploy-local.sh` → load a save where you've hired a shop employee →
-open the debug console → `StoreManager.Hire manager 4` while standing in the shop →
-`StoreManager.RunDay` / `StoreManager.Status`.
+1. Quit Big Ambitions.
+2. Download `StoreManager-vX.Y.Z.zip` from the [Releases page](../../releases).
+3. Extract it so you get this folder:
+   ```
+   %USERPROFILE%\AppData\LocalLow\Hovgaard Games\Big Ambitions\ModsLocal\StoreManager\
+       StoreManager.dll
+       Locales\  (en.json, nl.json)
+       Dependencies\  (0Harmony.dll + MonoMod/Cecil)
+   ```
+   (`AppData` is hidden — paste the path into the Explorer address bar.)
+4. Start the game. Options → Mods should list **Store Manager**.
 
-## Layout
+**Harmony note:** the mod bundles Harmony 2.10.2 in `Dependencies\`. If you run another mod that
+also bundles Harmony (e.g. *Lower Installation Fee*), that's fine — the game loads one shared copy.
 
-```
-mod/StoreManager/          drop into  <SDK clone>/Assets/Mods/StoreManager/
-  StoreManager.asmdef      links all canonical game DLLs (copied from Example-Options)
-  ModManifest.asset        Big Ambitions/Mod Manifest ScriptableObject
-  Locales/                 en.json, nl.json
-  Scripts/
-    Core/                  IModBigAmbitions entry points (init + city load)
-    Domain/                pure C# — ManagerRank, ManagementSkill, StorePolicy,
-                           DifficultyProfile, MistakeModel, StoreManagerData
-    Runtime/               ManagedStore (daily loop), DailyOperations, ManagerDirectory,
-                           WeeklyDigest
-    UI/                    PolicyOptions — OptionsService / ModOptions panel
-    PlayerScheduling/      PlayerShift, RegisterHandoff
-    Interop/               GameBindings — the ONLY file that touches game types.
-                           Everything Phase 0 must confirm is here, marked `// PHASE0:`.
-probe/StoreManagerProbe/   throwaway mod: proves the 3 writes (reassign task /
-                           write shift / trigger restock). Not shipped.
-```
+## How to use
 
-## Build (once you have the SDK + game)
+1. **Rent a Headquarters** if you don't have one.
+2. **Recruit a Store Manager.** Phone → Recruitment Agency → pick your HQ as the business →
+   the skill list now includes **"Store Manager"** → run the campaign → hire a candidate from
+   My Employees → Candidates.
+3. **Schedule them at the HQ.** My Employees → the manager → assign to your Headquarters, then
+   BizMan → HQ → Schedule → give them a shift on a desk / laptop / computer (those now accept the
+   Store Manager skill).
+4. **Open BizMan → your HQ → the "Store Managers" tab.**
+   - Pick the manager under **Make Store Manager**.
+   - Tick the shops you want them to supervise (up to the skill cap: 1 shop at skill 20, up to 5
+     near skill 100). Each shop **must already have a wholesale delivery contract**
+     (BizMan → that shop → Deliveries) — the manager tunes an existing contract, it doesn't
+     create one.
+   - Per shop, set:
+     - **Weekly budget $** — hard ceiling on that shop's delivery cost per week.
+     - **Keep stock for … days** — how many days of sales to keep on the shelf. The manager
+       orders toward this.
+     - **Order extra (%)** — a safety margin added on top of every order (still capped by the
+       budget).
+5. Each in-game **Saturday** the manager recalculates next Monday's delivery for every supervised
+   shop. You get a toast and a message from the "Store Manager" phone contact.
 
-1. Clone the SDK: `git clone https://github.com/hovgaardgames/bigambitions`
-2. Open in Unity **2022.3.62f2**, accept the DLL-import prompt (`BA_GAME_DLLS_IMPORTED`).
-3. Copy `mod/StoreManager/` → `<sdk>/Assets/Mods/StoreManager/`.
-4. Resolve every `// PHASE0:` marker in `Scripts/Interop/GameBindings.cs` against the
-   decompiled game assemblies (see the Phase 0 runbook).
-5. **Big Ambitions → Mod Builder → Build & Install.**
-6. Test from `ModsLocal`, then upload via the in-game Mod Creator.
+Global defaults for newly-assigned shops live in **Options → Mods → Store Manager**.
 
-Run the probe mod (step 3–5 with `probe/StoreManagerProbe/`) *first* — it is the Phase 0
-go/no-go gate.
+## Uninstall
+
+Run **Options → Mods → Store Manager → Safe uninstall** first (it turns every Store Manager back
+into a Purchasing Agent and clears the mod's plans). Save the game, then delete the
+`ModsLocal\StoreManager\` folder.
+
+If you delete the folder *without* running Safe uninstall while a Store Manager is hired, that
+save can fail to load (the game can't find the custom skill). This is a normal modding risk —
+just run Safe uninstall first.
+
+## Compatibility & caveats
+
+- Built and tested against **Big Ambitions Build 3672**. On a game update the mod runs a
+  self-check; if the game changed shape it **disables itself safely** (supervision pauses, the tab
+  hides, existing plans load read-only — nothing is lost) and tells you.
+- Single-HQ tested. Multi-HQ / multi-city not tested.
+- The mod never edits shared game data (business types, agency settings), so it won't make AI
+  rivals hire Store Managers.
+
+## Feedback
+
+Please report bugs / ideas via Discord or the [Issues page](../../issues). Handy to include:
+your Big Ambitions build number, what you did, and — if something threw — the
+`AppData\LocalLow\Hovgaard Games\Big Ambitions\Player.log` (`[StoreManager]` lines).
+
+---
+
+*Developer docs: `CONTINUE.md`, `DECISIONS.md`, `docs/DESIGN-v3.md`. Build from source:
+`bash build/deploy-local.sh` (needs the .NET SDK + a local Big Ambitions install).*
