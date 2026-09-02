@@ -138,29 +138,59 @@ namespace StoreManager.Interop.Harmony
     /// </summary>
     public sealed class HqCounterAlign : MonoBehaviour
     {
-        private RectTransform? _srcCount, _srcLabel;
+        private Transform? _good;
+        private static bool _dumped;
+        private int _t;
 
-        public void Init(Transform good)
+        public void Init(Transform good) => _good = good;
+
+        private void OnEnable() { _t = 0; }
+
+        private void LateUpdate()
         {
-            _srcCount = good.Find("Count") as RectTransform;
-            _srcLabel = good.Find("Label") as RectTransform;
+            _t++;
+            // match the good sibling's whole button rect (X only — the layout owns Y stacking) + its children
+            var self = (RectTransform)transform;
+            var src = _good as RectTransform;
+            if (src != null)
+            {
+                self.anchorMin = src.anchorMin; self.anchorMax = src.anchorMax; self.pivot = src.pivot;
+                self.sizeDelta = new Vector2(src.sizeDelta.x, self.sizeDelta.y);
+                self.anchoredPosition = new Vector2(src.anchoredPosition.x, self.anchoredPosition.y);
+                self.localScale = src.localScale;
+                Copy(src.Find("Count"), transform.Find("Count"));
+                Copy(src.Find("Label"), transform.Find("Label"));
+            }
+
+            if (!_dumped && _t == 45)
+            {
+                _dumped = true;
+                var sb = new System.Text.StringBuilder("\n[StoreManager] HQ counter POST-LAYOUT:\n");
+                var parent = transform.parent;
+                sb.AppendLine($"PARENT {parent?.name} comps=[{string.Join(",", System.Array.ConvertAll(parent != null ? parent.GetComponents<Component>() : System.Array.Empty<Component>(), c => c.GetType().Name))}]");
+                if (_good != null) Row("GOOD ", (RectTransform)_good, sb);
+                Row("CLONE", self, sb);
+                Debug.Log(sb.ToString());
+            }
         }
 
-        private void OnEnable() => Apply();
-        private void LateUpdate() => Apply();
-
-        private void Apply()
+        private static void Row(string tag, RectTransform rt, System.Text.StringBuilder sb)
         {
-            Copy(_srcCount, transform.Find("Count") as RectTransform);
-            Copy(_srcLabel, transform.Find("Label") as RectTransform);
+            void W(RectTransform r, int d)
+            {
+                var tmp = r.GetComponent<TMPro.TextMeshProUGUI>();
+                sb.AppendLine($"{tag} {new string(' ', d * 2)}{r.name} pos={r.anchoredPosition:F0} size={r.rect.size:F0} world={((RectTransform)r).position:F0}"
+                    + (tmp != null ? $"  \"{tmp.text}\" align={tmp.alignment}" : ""));
+                for (int i = 0; i < r.childCount; i++) if (r.GetChild(i) is RectTransform c) W(c, d + 1);
+            }
+            W(rt, 0);
         }
 
-        private static void Copy(RectTransform? src, RectTransform? dst)
+        private static void Copy(Transform? src, Transform? dst)
         {
-            if (src == null || dst == null) return;
-            dst.anchorMin = src.anchorMin; dst.anchorMax = src.anchorMax; dst.pivot = src.pivot;
-            dst.sizeDelta = src.sizeDelta; dst.anchoredPosition = src.anchoredPosition;
-            dst.localScale = src.localScale;
+            if (src is not RectTransform s || dst is not RectTransform d) return;
+            d.anchorMin = s.anchorMin; d.anchorMax = s.anchorMax; d.pivot = s.pivot;
+            d.sizeDelta = s.sizeDelta; d.anchoredPosition = s.anchoredPosition; d.localScale = s.localScale;
         }
     }
 }
