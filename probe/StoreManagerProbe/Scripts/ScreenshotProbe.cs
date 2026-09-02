@@ -12,13 +12,11 @@ using UnityEngine;
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  SCREENSHOT PROBE — gated on a marker file "sm-autoshot" next to the probe DLL.
-//  Main menu: loads the most-advanced save. City load: opens BizMan → HQ →
-//  "StoreManagers" tab, captures a PNG next to Player.log, and dumps the tab's
-//  UI-element geometry to the log. Lets the mod author self-assess the HQ tab
-//  layout without a human screenshotting each iteration.
+//  It does NOT load a save (the author kept picking the wrong one). YOU load your
+//  own save; then on city load it opens BizMan → HQ → "StoreManagers" tab,
+//  captures sm-tab-shot.png next to Player.log, and dumps the tab UI geometry.
 // ─────────────────────────────────────────────────────────────────────────────
 
-[assembly: RegisterModClass(typeof(StoreManagerProbe.AutoShotMainMenu))]
 [assembly: RegisterModClass(typeof(StoreManagerProbe.AutoShotCity))]
 
 namespace StoreManagerProbe
@@ -30,61 +28,6 @@ namespace StoreManagerProbe
 
         public static string OutDir =>
             Path.GetDirectoryName(Application.consoleLogPath) ?? Application.persistentDataPath;
-    }
-
-    [ModEntryMainMenu]
-    public sealed class AutoShotMainMenu : IModBigAmbitions
-    {
-        private GameObject? _host;
-        public string[] RelativeAssetBundlePaths => Array.Empty<string>();
-        public Task OnLoadAsync(ModContext c)
-        {
-            if (!AutoShot.Enabled(c)) return Task.CompletedTask;
-            _host = new GameObject("SMAutoShotMenu");
-            UnityEngine.Object.DontDestroyOnLoad(_host);
-            _host.AddComponent<LoadRunner>().Logger = c.Logger;
-            return Task.CompletedTask;
-        }
-        public Task OnUnloadAsync() { if (_host) UnityEngine.Object.Destroy(_host); return Task.CompletedTask; }
-    }
-
-    public sealed class LoadRunner : MonoBehaviour
-    {
-        public IModLogger? Logger;
-        private void Start() => StartCoroutine(Go());
-        private IEnumerator Go()
-        {
-            yield return new WaitForSeconds(6f);
-            object? target = null; int best = -1;
-            try
-            {
-                var helper = Find("SaveGamePathHelper");
-                var m = helper?.GetMethod("GetAllSaveGamesFromVersion", BindingFlags.Public | BindingFlags.Static);
-                if (m?.Invoke(null, new object?[] { null }) is IEnumerable list)
-                    foreach (var s in list)
-                    {
-                        int day = s.GetType().GetField("day")?.GetValue(s) is int i ? i : 0;
-                        if (day > best) { best = day; target = s; }
-                    }
-            }
-            catch (Exception e) { Logger?.Warn("[AUTOSHOT] save scan: " + e.Message); }
-
-            Task<bool>? t = null;
-            try
-            {
-                t = target != null
-                    ? typeof(SaveGameManager).GetMethod("LoadAsync", BindingFlags.Public | BindingFlags.Static, null,
-                          new[] { target.GetType(), typeof(bool) }, null)?.Invoke(null, new object[] { target, true }) as Task<bool>
-                    : SaveGameManager.LoadAsync(null, true);
-            }
-            catch (Exception e) { Logger?.Error(e); yield break; }
-            while (t != null && !t.IsCompleted) yield return null;
-            Logger?.Info($"[AUTOSHOT] loaded save day={best} ok={t?.Result}");
-        }
-
-        private static Type? Find(string n) => AppDomain.CurrentDomain.GetAssemblies()
-            .SelectMany(a => { try { return a.GetTypes(); } catch { return Array.Empty<Type>(); } })
-            .FirstOrDefault(x => x.Name == n);
     }
 
     [ModEntryOnCityLoad]
