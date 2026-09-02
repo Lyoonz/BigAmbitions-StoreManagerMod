@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Linq;
 using System.Reflection;
 using TMPro;
 using UnityEngine;
@@ -172,6 +173,26 @@ namespace StoreManager.UI
             var le = go.AddComponent<LayoutElement>();
             le.minHeight = S(height); le.preferredHeight = S(height);
             return go;
+        }
+
+        /// <summary>
+        /// <c>[−] [ editable value ] [+]</c>. The buttons step by <paramref name="step"/> (clamped to
+        /// [min,max]); the field commits whatever you type on end-edit. Both call <paramref name="onSet"/>
+        /// with the new integer value.
+        /// </summary>
+        public static void Stepper(Transform parent, long value, long step, long min, long max, float fieldWidth, Action<long> onSet)
+        {
+            long Clamp(long v) => v < min ? min : (v > max ? max : v);
+
+            FixedWidth(Button(parent, "−", () => onSet(Clamp(value - step)), 28f).gameObject, 34f);
+
+            NumberField(parent, value.ToString(), fieldWidth, s =>
+            {
+                var digits = new string((s ?? "").Where(char.IsDigit).ToArray());
+                if (long.TryParse(digits, out var v)) onSet(Clamp(v));
+            });
+
+            FixedWidth(Button(parent, "+", () => onSet(Clamp(value + step)), 28f).gameObject, 34f);
         }
 
         /// <summary>An editable numeric field. <paramref name="onCommit"/> gets the raw string on end-edit.</summary>

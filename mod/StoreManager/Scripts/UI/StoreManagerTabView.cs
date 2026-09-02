@@ -154,30 +154,22 @@ namespace StoreManager.UI
                 if (supervised && a != null)
                 {
                     var assignment = a;
+                    var mgrId = plan.ManagerEmployeeId;
                     var lim = UiKit.Row(_content.transform, false, 10f, 36f);
 
                     UiKit.FixedWidth(UiKit.Label(lim.transform, "storemanager_bizmantab_budget".L("Weekly budget $"), 12f, UiKit.MutedColor).gameObject, 150f);
-                    UiKit.NumberField(lim.transform, ((long)assignment.WeeklyRestockBudgetCap).ToString(), 120f, s =>
+                    UiKit.Stepper(lim.transform, (long)assignment.WeeklyRestockBudgetCap, 500, 0, 10_000_000, 130f, v =>
                     {
-                        if (TryParseAmount(s, out var v) && v != assignment.WeeklyRestockBudgetCap)
-                        { dir.SetCap(plan.ManagerEmployeeId, assignment.StoreAddress, v); Rebuild(); }
+                        if (v != assignment.WeeklyRestockBudgetCap) { dir.SetCap(mgrId, assignment.StoreAddress, v); Rebuild(); }
                     });
 
                     UiKit.FixedWidth(UiKit.Label(lim.transform, "storemanager_bizmantab_days".L("Stock buffer (days)"), 12f, UiKit.MutedColor).gameObject, 180f);
-                    UiKit.NumberField(lim.transform, assignment.TargetDaysOfStock.ToString(), 70f, s =>
+                    UiKit.Stepper(lim.transform, assignment.TargetDaysOfStock, 1, 1, 60, 70f, v =>
                     {
-                        if (int.TryParse(new string(s.Where(char.IsDigit).ToArray()), out var d) && d != assignment.TargetDaysOfStock)
-                        { dir.SetTargetDays(plan.ManagerEmployeeId, assignment.StoreAddress, d); Rebuild(); }
+                        if (v != assignment.TargetDaysOfStock) { dir.SetTargetDays(mgrId, assignment.StoreAddress, (int)v); Rebuild(); }
                     });
                 }
             }
-        }
-
-        private static bool TryParseAmount(string s, out decimal value)
-        {
-            var digits = new string((s ?? "").Where(char.IsDigit).ToArray());
-            if (decimal.TryParse(digits, out value)) return true;
-            value = 0m; return false;
         }
 
         private static void Announce(ActionResult r)
