@@ -174,8 +174,9 @@ namespace StoreManager.UI
 
         private static void Announce(ActionResult r)
         {
-            Feedback.Toast(r.Ok ? Feedback.Level.Success : Feedback.Level.Warning,
-                r.Ok ? "storemanager_notify_ok" : "storemanager_notify_blocked", D("msg", r.Message));
+            // the directory already toasts on success — only surface failures here
+            if (!r.Ok)
+                Feedback.Toast(Feedback.Level.Warning, "storemanager_notify_blocked", D("msg", r.Message));
             Debug.Log("[StoreManager] " + (r.Ok ? "" : "blocked: ") + r.Message);
         }
 

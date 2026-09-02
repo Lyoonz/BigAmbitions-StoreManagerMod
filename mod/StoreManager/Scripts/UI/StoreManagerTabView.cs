@@ -97,7 +97,7 @@ namespace StoreManager.UI
                     var cid = c.Id;
                     var btn = UiKit.Button(row.transform, "storemanager_bizmantab_make".L("Make Store Manager"), () =>
                     {
-                        Announce(dir.AdoptManager(hq.Address, cid));
+                        AnnounceIfFailed(dir.AdoptManager(hq.Address, cid));
                         Rebuild();
                     }, 30f, UiKit.AccentColor);
                     UiKit.FixedWidth(btn.gameObject, 230f);
@@ -145,8 +145,8 @@ namespace StoreManager.UI
                                : "storemanager_bizmantab_assign".L("Assign"),
                     () =>
                     {
-                        if (supervised) Announce(dir.UnassignStore(plan.ManagerEmployeeId, addr));
-                        else Announce(dir.AssignStore(plan.ManagerEmployeeId, addr));
+                        if (supervised) AnnounceIfFailed(dir.UnassignStore(plan.ManagerEmployeeId, addr));
+                        else AnnounceIfFailed(dir.AssignStore(plan.ManagerEmployeeId, addr));
                         Rebuild();
                     }, 28f, supervised ? UiKit.AccentColor : null, enabled: supervised || !atCap);
                 UiKit.FixedWidth(tgl.gameObject, 200f);
@@ -184,10 +184,14 @@ namespace StoreManager.UI
             UiKit.Stepper(row.transform, value, step, min, max, 120f, onSet);
         }
 
-        private static void Announce(ActionResult r)
+        /// <summary>
+        /// Toast only on failure. <see cref="ManagerDirectory"/>'s adopt/assign/unassign already
+        /// show their own success toast, so announcing here too would double up.
+        /// </summary>
+        private static void AnnounceIfFailed(ActionResult r)
         {
-            Feedback.Toast(r.Ok ? Feedback.Level.Success : Feedback.Level.Warning,
-                r.Ok ? "storemanager_notify_ok" : "storemanager_notify_blocked", D(r.Message));
+            if (!r.Ok)
+                Feedback.Toast(Feedback.Level.Warning, "storemanager_notify_blocked", D(r.Message));
         }
 
         private static System.Collections.Generic.Dictionary<string, string> D(string msg) => new() { { "msg", msg } };

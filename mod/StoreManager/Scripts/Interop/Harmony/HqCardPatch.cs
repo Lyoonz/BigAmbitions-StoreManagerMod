@@ -29,6 +29,25 @@ namespace StoreManager.Interop.Harmony
         public static string? Disabled { get; private set; }
 
         private static Type? _t;
+        private static bool _dumped;
+
+        private static void DumpRt(string tag, Transform root, System.Text.StringBuilder sb)
+        {
+            void Walk(Transform t, int d)
+            {
+                var rt = t as RectTransform;
+                var tmp = t.GetComponent<TMPro.TextMeshProUGUI>();
+                sb.Append(tag).Append(' ').Append(new string(' ', d * 2)).Append(t.name)
+                  .Append("  anchoredPos=").Append(rt != null ? rt.anchoredPosition.ToString("F0") : "-")
+                  .Append(" size=").Append(rt != null ? rt.sizeDelta.ToString("F0") : "-")
+                  .Append(" anchors=").Append(rt != null ? $"{rt.anchorMin.x:F2},{rt.anchorMin.y:F2}-{rt.anchorMax.x:F2},{rt.anchorMax.y:F2}" : "-")
+                  .Append(" pivot=").Append(rt != null ? rt.pivot.ToString("F2") : "-");
+                if (tmp != null) sb.Append(" TMP=\"").Append(tmp.text).Append("\" align=").Append(tmp.alignment);
+                sb.AppendLine();
+                for (int i = 0; i < t.childCount; i++) Walk(t.GetChild(i), d + 1);
+            }
+            Walk(root, 0);
+        }
 
         public static bool Resolve()
         {
@@ -115,6 +134,15 @@ namespace StoreManager.Interop.Harmony
                     btn.onClick.RemoveAllListeners();
                     var addr = hq.Address;
                     btn.onClick.AddListener(() => BizManTabPatch.OpenHqTab(addr));
+                }
+
+                if (!_dumped)
+                {
+                    _dumped = true;
+                    var sb = new System.Text.StringBuilder("\n[StoreManager] HQ counter geometry:\n");
+                    DumpRt("ANCHOR", anchor, sb);
+                    DumpRt("CLONE ", clone.transform, sb);
+                    Debug.Log(sb.ToString());
                 }
             }
             catch (Exception e) { Debug.LogError("[StoreManager] HQ card postfix swallowed: " + e); }
