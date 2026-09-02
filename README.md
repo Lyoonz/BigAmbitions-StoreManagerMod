@@ -13,6 +13,30 @@ its own **"Store Managers" tab** in the BizMan HQ screen, and a counter on the H
 
 ---
 
+## ⚠️ Read this before you install
+
+This mod adds a **custom employee skill** to your save. That has consequences you should
+understand — this is normal for skill-adding mods, not a defect:
+
+- **Back up your save first.** Copy your `.hsg` save file(s) from
+  `%USERPROFILE%\AppData\LocalLow\Hovgaard Games\Big Ambitions\Saves\` somewhere safe.
+  Don't test this on a save you can't afford to lose.
+- **If a game update breaks the mod:** it runs a self-check on load and, if the game changed
+  shape, **disables itself safely** — supervision pauses, the HQ tab hides, existing plans load
+  read-only. Your save still loads and **no data is lost**, but the manager stops working until
+  a mod update. On `onSaveGame` it also re-skills any Store Manager back to Purchasing Agent so
+  the save stays clean.
+- **If you remove the mod:** you **must** run **Options → Mods → Store Manager → Safe uninstall**
+  and then save, *before* deleting the mod folder. Safe uninstall turns every Store Manager back
+  into a Purchasing Agent. If you delete the `ModsLocal\StoreManager\` folder while a Store
+  Manager is still hired and you never ran Safe uninstall, **that save can fail to load** — the
+  game looks for a skill that no longer exists. (Recovery: put the mod folder back, load, run
+  Safe uninstall, save, then remove it.)
+
+Bottom line: keep a backup, and always Safe-uninstall before deleting the mod.
+
+---
+
 ## Install
 
 1. Quit Big Ambitions.
@@ -58,13 +82,13 @@ Global defaults for newly-assigned shops live in **Options → Mods → Store Ma
 
 ## Uninstall
 
-Run **Options → Mods → Store Manager → Safe uninstall** first (it turns every Store Manager back
-into a Purchasing Agent and clears the mod's plans). Save the game, then delete the
-`ModsLocal\StoreManager\` folder.
+1. **Options → Mods → Store Manager → Safe uninstall** (re-skills every Store Manager to
+   Purchasing Agent, clears the mod's plans).
+2. **Save the game.**
+3. Delete the `ModsLocal\StoreManager\` folder.
 
-If you delete the folder *without* running Safe uninstall while a Store Manager is hired, that
-save can fail to load (the game can't find the custom skill). This is a normal modding risk —
-just run Safe uninstall first.
+Skipping step 1 while a Store Manager is hired can leave a save that won't load — see the
+warning at the top of this file.
 
 ## Compatibility & caveats
 
