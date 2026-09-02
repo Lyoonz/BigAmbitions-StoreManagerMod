@@ -27,7 +27,7 @@ namespace StoreManager.Interop
         private const float BaseHourlyWage = 46f;
 
         private static SkillData? _skill;
-        private static bool _buildAttempted;
+        private static bool _buildFailed;             // a genuine build failure (BuildTagCache threw) — don't retry/spam
         private static IDictionary? _skillsDict;      // SkillHelper.Skills, non-generic view
         private static bool _reflectionFailed;
 
@@ -41,9 +41,10 @@ namespace StoreManager.Interop
         {
             get
             {
-                if (_skill != null || _buildAttempted) return _skill;
-                _buildAttempted = true;
+                if (_skill != null) return _skill;       // Unity's == treats a destroyed SO as null → rebuild
+                if (_buildFailed) return null;
                 _skill = TryBuild();
+                _buildFailed = _skill == null;
                 return _skill;
             }
         }
@@ -54,6 +55,8 @@ namespace StoreManager.Interop
             try
             {
                 var sd = ScriptableObject.CreateInstance<SkillData>();
+                // survive scene transitions and never get written to a Unity asset
+                sd.hideFlags = HideFlags.HideAndDontSave;
                 sd.name = StoreManagerSkill;
                 sd.skillName = StoreManagerSkill;
                 sd.baseHourlyWage = BaseHourlyWage;

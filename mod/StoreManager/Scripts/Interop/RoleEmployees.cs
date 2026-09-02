@@ -41,47 +41,58 @@ namespace StoreManager.Interop
             var addr = GameApi.HqAddressObject(hqAddress);
             if (addr == null) return new HireResult(false, "couldn't resolve the HQ address", "");
 
+            EmployeeInstance? cand;
             try
             {
-                var cand = RecruitmentHelper.GenerateCandidate(ManagerSkill, StartingSkill, (Address)addr, null, 0f);
-                if (cand == null) return new HireResult(false, "candidate generation returned nothing", "");
-
-                try { cand.characterData.name ??= "Store Manager"; } catch { }
-
-                // finish any pending negotiation the generator may have opened, then hire
-                TryFinishNegotiation(cand);
-                EmployeeHelper.HireCandidate(cand);
-
-                // make sure it landed in the live roster
-                if (EmployeeHelper.GetEmployeeById(cand.id, false) == null)
-                {
-                    try
-                    {
-                        EmployeeHelper.GetEmployeeInstances().Add(cand);
-                        EmployeeHelper.EmployeeInstancesDictionary[cand.id] = cand;
-                    }
-                    catch { }
-                }
-
-                // ensure the HQ assignment stuck
-                try
-                {
-                    if (cand.assignedAddress == null)
-                        typeof(EmployeeInstance).GetField("assignedAddress")?.SetValue(cand, addr);
-                }
-                catch { }
-
-                float wage = SafeWage();
-                return new HireResult(true,
-                    $"{cand.characterData?.name ?? "A Store Manager"} hired at the HQ (~${wage:N0}/h). " +
-                    "Schedule them on an HQ desk, then adopt them in the panel.",
-                    cand.id);
+                cand = RecruitmentHelper.GenerateCandidate(ManagerSkill, StartingSkill, (Address)addr, null, 0f);
             }
             catch (Exception e)
             {
-                Debug.LogError("[StoreManager] Recruit failed: " + e);
-                return new HireResult(false, "hire failed: " + e.Message, "");
+                Debug.LogError("[StoreManager] GenerateCandidate threw: " + e);
+                return new HireResult(false, "candidate generation failed: " + e.Message, "");
             }
+            if (cand == null) return new HireResult(false, "candidate generation returned nothing", "");
+
+            try
+            {
+                var cd = cand.characterData;
+                if (cd != null && string.IsNullOrEmpty(cd.name)) cd.name = "Store Manager";
+            }
+            catch { }
+
+            // best-effort vanilla hire (finishes negotiation + books the signing cost)
+            try
+            {
+                TryFinishNegotiation(cand);
+                EmployeeHelper.HireCandidate(cand);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("[StoreManager] HireCandidate threw, falling back to direct roster insert: " + e.Message);
+            }
+
+            // guarantee it's in the live roster and assigned to the HQ (same insert the SelfTest uses)
+            try
+            {
+                if (EmployeeHelper.GetEmployeeById(cand.id, false) == null)
+                {
+                    EmployeeHelper.GetEmployeeInstances().Add(cand);
+                    EmployeeHelper.EmployeeInstancesDictionary[cand.id] = cand;
+                }
+                if (cand.assignedAddress == null)
+                    typeof(EmployeeInstance).GetField("assignedAddress")?.SetValue(cand, addr);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("[StoreManager] roster insert failed: " + e);
+                return new HireResult(false, "couldn't add the manager to your roster: " + e.Message, "");
+            }
+
+            float wage = SafeWage();
+            return new HireResult(true,
+                $"{cand.characterData?.name ?? "A Store Manager"} hired at the HQ (~${wage:N0}/h). " +
+                "Assign them to the HQ in My Employees, then pick them in the panel.",
+                cand.id);
         }
 
         private static void TryFinishNegotiation(EmployeeInstance cand)

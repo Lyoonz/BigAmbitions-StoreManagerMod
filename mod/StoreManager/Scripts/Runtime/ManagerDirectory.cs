@@ -217,6 +217,7 @@ namespace StoreManager.Runtime
         public void RunWeeklyPlanning()
         {
             if (_readOnly) return;
+            if (!RoleSystemState.IsActive) return;   // role disabled this build — supervision paused
             var planner = new WeeklyRestockPlanner();
             foreach (var plan in _plans.ToList())
             {
@@ -245,10 +246,14 @@ namespace StoreManager.Runtime
             bool dirty = false;
             foreach (var plan in _plans.ToList())
             {
-                // manager gone entirely -> tear down, but only when we can trust the employee list
-                if (!GameApi.EmployeeExists(plan.ManagerEmployeeId))
+                // manager gone entirely, or no longer carries the custom skill (fired/quit, trained
+                // it away, or re-skilled by a degraded session) -> tear down, but only when we can
+                // trust the employee list.
+                bool exists = GameApi.EmployeeExists(plan.ManagerEmployeeId);
+                bool lostSkill = exists && allowTeardown && !GameApi.HasManagerSkill(plan.ManagerEmployeeId);
+                if (!exists || lostSkill)
                 {
-                    if (!allowTeardown) { plan.Dormant = true; continue; }
+                    if (!exists && !allowTeardown) { plan.Dormant = true; continue; }
                     foreach (var a in plan.Assignments.ToList()) RestoreAndRemove(plan, a);
                     _plans.Remove(plan);
                     _dormantNotified.Remove(plan.ManagerEmployeeId);
