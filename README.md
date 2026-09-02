@@ -81,6 +81,11 @@ Please report bugs / ideas via Discord or the [Issues page](../../issues). Handy
 your Big Ambitions build number, what you did, and — if something threw — the
 `AppData\LocalLow\Hovgaard Games\Big Ambitions\Player.log` (`[StoreManager]` lines).
 
+## License
+
+[MIT](LICENSE). Unofficial fan-made mod — not affiliated with Hovgaard Games. Bundled
+dependencies (Harmony, MonoMod, Cecil) keep their own MIT licenses.
+
 ---
 
 *Developer docs: `CONTINUE.md`, `DECISIONS.md`, `docs/DESIGN-v3.md`. Build from source:
