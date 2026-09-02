@@ -4,6 +4,20 @@
 
   "sm:skill_storemanager": "Filiaalmanager",
 
+  "storemanager_bizmantab_menu": "Filiaalmanagers",
+  "storemanager_bizmantab_title": "Filiaalmanagers",
+  "storemanager_bizmantab_shifthint": "Nieuwe medewerkers moeten hier eerst een bureaudienst krijgen (BizMan → HQ → Rooster) voordat je ze kunt kiezen.",
+  "storemanager_bizmantab_assignhint": "Nieuwe medewerkers moeten eerst aan dit kantoor worden toegewezen voordat je ze kunt kiezen.",
+  "storemanager_bizmantab_pickmgr": "Beschikbare managers",
+  "storemanager_bizmantab_make": "Tot filiaalmanager maken",
+  "storemanager_bizmantab_dormant": "inactief (niet ingeroosterd)",
+  "storemanager_bizmantab_drop": "Verwijderen",
+  "storemanager_bizmantab_cap": "Toezicht op {0} van {1} winkels (skill-limiet)",
+  "storemanager_bizmantab_nocontract": "(geen leveringscontract)",
+  "storemanager_bizmantab_supervising": "Onder toezicht ✓",
+  "storemanager_bizmantab_atcap": "limiet bereikt",
+  "storemanager_bizmantab_assign": "Toewijzen",
+
   "storemanager_act_label": "Snelle acties",
   "storemanager_act_pick": "— kies een actie —",
   "storemanager_act_recruit": "Nieuwe filiaalmanager inhuren op mijn kantoor",
@@ -16,6 +30,7 @@
   "storemanager_opt_no_hq": "Huur eerst een kantoor (Headquarters) — de manager werkt daarvandaan.",
   "storemanager_opt_role_disabled": "De Filiaalmanager-rol is uitgeschakeld op deze game-versie — toezicht is gepauzeerd en er gaat geen data verloren. Bestaande plannen laden alleen-lezen.",
   "storemanager_opt_recruit_hint": "Nog geen filiaalmanager. Gebruik \"Nieuwe filiaalmanager inhuren op mijn kantoor\" hierboven, rooster 'm daarna in op een kantoorplek en kies 'm hieronder.",
+  "storemanager_opt_hqtab_hint": "Je kunt dit ook regelen via het tabblad \"Filiaalmanagers\" in het BizMan-scherm van je kantoor — net als Purchasing Agents / HR / Logistiek.",
   "storemanager_opt_no_candidates": "Nog geen filiaalmanager op je kantoor. Huur er een via de snelle actie hierboven, wijs 'm toe aan je kantoor en geef 'm een dienst — dan verschijnt-ie hier.",
   "storemanager_opt_pick_manager": "— kies een manager —",
   "storemanager_opt_manager_label": "Filiaalmanager",

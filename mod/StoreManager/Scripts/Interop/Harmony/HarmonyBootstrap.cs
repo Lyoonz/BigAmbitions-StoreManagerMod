@@ -43,7 +43,14 @@ namespace StoreManager.Interop.Harmony
                 LastError = Patched ? null
                     : $"OnSkillDataLoaded={skillLoad}, GetData(string)={getDataStr}, GetData(Skill)={getDataSkill}";
 
-                if (Patched) Debug.Log($"[StoreManager] Harmony patches applied (GetData(Skill)={getDataSkill}).");
+                // Non-load-bearing: the HQ BizMan tab. Failure just disables that tab.
+                try
+                {
+                    if (BizManTabPatch.Resolve()) BizManTabPatch.EnsurePatched(_harmony);
+                }
+                catch (Exception e) { Debug.LogError("[StoreManager] BizMan tab patch setup threw: " + e); }
+
+                if (Patched) Debug.Log($"[StoreManager] Harmony patches applied (GetData(Skill)={getDataSkill}, HQ tab={BizManTabPatch.Patched}).");
                 else Debug.LogError("[StoreManager] Harmony patch incomplete: " + LastError);
                 return Patched;
             }

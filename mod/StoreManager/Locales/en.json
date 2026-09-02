@@ -4,6 +4,20 @@
 
   "sm:skill_storemanager": "Store Manager",
 
+  "storemanager_bizmantab_menu": "Store Managers",
+  "storemanager_bizmantab_title": "Store Managers",
+  "storemanager_bizmantab_shifthint": "New hires need a desk shift here (BizMan → HQ → Schedule) before you can pick them.",
+  "storemanager_bizmantab_assignhint": "New hires need to be assigned to this HQ before you can pick them.",
+  "storemanager_bizmantab_pickmgr": "Eligible managers",
+  "storemanager_bizmantab_make": "Make Store Manager",
+  "storemanager_bizmantab_dormant": "idle (not scheduled)",
+  "storemanager_bizmantab_drop": "Remove",
+  "storemanager_bizmantab_cap": "Supervising {0} of {1} stores (skill cap)",
+  "storemanager_bizmantab_nocontract": "(no delivery contract)",
+  "storemanager_bizmantab_supervising": "Supervising ✓",
+  "storemanager_bizmantab_atcap": "cap reached",
+  "storemanager_bizmantab_assign": "Assign",
+
   "storemanager_act_label": "Quick actions",
   "storemanager_act_pick": "— choose an action —",
   "storemanager_act_recruit": "Hire a new Store Manager onto my HQ",
@@ -16,6 +30,7 @@
   "storemanager_opt_no_hq": "Rent an office (Headquarters) first — the manager works from there.",
   "storemanager_opt_role_disabled": "The Store Manager role is disabled on this game build — supervision is paused and no data is lost. Existing plans load read-only.",
   "storemanager_opt_recruit_hint": "No Store Manager yet. Use \"Hire a new Store Manager onto my HQ\" above, then schedule them on an HQ desk and pick them below.",
+  "storemanager_opt_hqtab_hint": "You can also manage this from the \"Store Managers\" tab in your HQ's BizMan screen — same as Purchasing Agents / HR / Logistics.",
   "storemanager_opt_no_candidates": "No Store Manager at your office yet. Hire one with the quick action above, assign them to your HQ and give them a shift — then they'll appear here.",
   "storemanager_opt_pick_manager": "— pick a manager —",
   "storemanager_opt_manager_label": "Store Manager",

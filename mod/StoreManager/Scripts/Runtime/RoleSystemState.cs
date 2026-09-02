@@ -70,8 +70,15 @@ namespace StoreManager.Runtime
         }
 
         /// <summary>Panel/console one-liner.</summary>
-        public static string Summary() => State == RoleSystem.Active
-            ? "Store Manager role: active" + (HqDeskAccess.AllDesksReady() ? " (HQ desks accept the skill)" : " (HQ desks NOT patched — manager works when assigned to HQ)")
-            : "Store Manager role: DISABLED on this game build — supervision paused, no data lost (" + Reason + ")";
+        public static string Summary()
+        {
+            if (State != RoleSystem.Active)
+                return "Store Manager role: DISABLED on this game build — supervision paused, no data lost (" + Reason + ")";
+            string desks = HqDeskAccess.AllDesksReady() ? "desks OK" : "desks NOT patched (manager works when assigned to HQ)";
+            string tab = Interop.Harmony.BizManTabPatch.Patched ? "HQ tab OK"
+                       : Interop.Harmony.BizManTabPatch.Disabled != null ? "HQ tab off (" + Interop.Harmony.BizManTabPatch.Disabled + ")"
+                       : "HQ tab pending";
+            return $"Store Manager role: active — {desks}, {tab}";
+        }
     }
 }

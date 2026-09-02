@@ -239,6 +239,12 @@ namespace StoreManagerProbe
             try { L("V3 HqDeskAccess.Applied=" + desk?.GetProperty("Applied")?.GetValue(null)
                      + " AllDesksReady=" + desk?.GetMethod("AllDesksReady")?.Invoke(null, null)); }
             catch (Exception e) { L("V3 desk read threw: " + e.Message); }
+
+            var tab = FindTypeFull("StoreManager.Interop.Harmony.BizManTabPatch");
+            try { L("V3 BizManTabPatch Available=" + tab?.GetProperty("Available")?.GetValue(null)
+                     + " Patched=" + tab?.GetProperty("Patched")?.GetValue(null)
+                     + " Disabled=" + tab?.GetProperty("Disabled")?.GetValue(null)); }
+            catch (Exception e) { L("V3 tab read threw: " + e.Message); }
             L("---- end V3 checks ----");
         }
 

@@ -134,6 +134,8 @@ namespace StoreManager.UI
 
             if (!RoleSystemState.IsActive)
                 o.AddHeader("storemanager_opt_role_disabled");
+            else if (Interop.Harmony.BizManTabPatch.Patched)
+                o.AddHeader("storemanager_opt_hqtab_hint");
 
             var dir = Core.StoreManagerCityMod.Active;
             if (dir == null) { o.AddHeader("storemanager_opt_no_city"); AddDefaults(o); return; }
