@@ -37,7 +37,9 @@ whole point of Option 1. Tell me exactly what the row says.
 
 ## 3. Put them to work
 
-- **My Employees → the manager → assign to your Headquarters** (if not already).
+- **BizMan → your HQ → Schedule** → give the manager a shift on a **desk / laptop / computer**.
+  The desk now accepts the Filiaalmanager skill (update 2026-09-02). If the game still won't let
+  you, the `[SKILLPROBE]` `V3 HqDeskAccess.AllDesksReady` line says why.
 - Panel → **Store Manager** dropdown → pick them.
 - Panel → tick **The Signature Mart** (it has a delivery contract).
 - Panel → **Quick actions → "Run the weekly restock pass now"**.

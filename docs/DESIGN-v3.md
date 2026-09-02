@@ -107,9 +107,12 @@ accept "Purchasing Agent" as the shown title.
   (`BizManBusiness.cs:166` kicks the user off a tab not in `_tabs`), `SetActive`. Runtime uGUI
   content. Gated + degrade-to-panel. Both critiques: highest fragility, lowest value — do it
   last, one tab only (Team Leader is a section inside it).
-- **HQ desk `suitableSkills`** append (`ba:itemname_desktopcomputer`/`laptop`/`computer`) so the
-  manager can take a real HQ shift → the plan gates on `IsAssignedToAnyWorkShift()`. v1 uses the
-  `skipScheduleCheck` degrade (plan active whenever the manager is hired + `assignedAddress == HQ`).
+- ~~**HQ desk `suitableSkills`** append~~ **DONE 2026-09-02** (post-test feedback: user couldn't
+  schedule the manager). `Interop/HqDeskAccess.cs` appends `sm:skill_storemanager` to the three
+  desk items' `suitableSkills`, re-applied from a Harmony postfix on `ItemsGetter.OnItemsLoaded`
+  + a city-load backstop. `GameApi.RequireHqShift` is now `=> HqDeskAccess.AllDesksReady()` — the
+  plan requires a real HQ desk shift once the append lands, and falls back to "assigned to HQ" if
+  it doesn't. Manager is now scheduled from **BizMan → HQ → Schedule** like a vanilla manager.
 - **Assistant Manager** — **not a third skill.** An `IsAssistant=true` flag on a Team Leader hire:
   +1 store cap, +1 TL capacity. Nothing else.
 - **HQ "expansion"** — no game upgrade exists. Mod-invented capacity = live desk count
