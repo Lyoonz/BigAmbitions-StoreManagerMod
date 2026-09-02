@@ -78,7 +78,10 @@ namespace StoreManager.Runtime
             string tab = Interop.Harmony.BizManTabPatch.Patched ? "HQ tab OK"
                        : Interop.Harmony.BizManTabPatch.Disabled != null ? "HQ tab off (" + Interop.Harmony.BizManTabPatch.Disabled + ")"
                        : "HQ tab pending";
-            return $"Store Manager role: active — {desks}, {tab}";
+            string agency = Interop.Harmony.RecruitmentPatch.Patched ? "agency OK"
+                          : Interop.Harmony.RecruitmentPatch.Disabled != null ? "agency off (" + Interop.Harmony.RecruitmentPatch.Disabled + ")"
+                          : "agency pending";
+            return $"Store Manager role: active — {desks}, {tab}, {agency}";
         }
     }
 }

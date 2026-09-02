@@ -17,8 +17,9 @@
   "storemanager_bizmantab_supervising": "Supervising ✓",
   "storemanager_bizmantab_atcap": "cap reached",
   "storemanager_bizmantab_assign": "Assign",
-  "storemanager_bizmantab_budget": "Weekly budget",
+  "storemanager_bizmantab_budget": "Weekly budget $",
   "storemanager_bizmantab_days": "Stock buffer (days)",
+  "storemanager_bizmantab_recruithow": "Recruit a Store Manager through your phone → Recruitment Agency (pick this HQ, skill \"Store Manager\"), then give them a desk shift in BizMan → HQ → Schedule. They'll show up below.",
 
   "storemanager_act_label": "Quick actions",
   "storemanager_act_pick": "— choose an action —",

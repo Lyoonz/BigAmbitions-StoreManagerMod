@@ -20,7 +20,6 @@ namespace StoreManager.UI
     public sealed class StoreManagerTabView : MonoBehaviour
     {
         private RectTransform? _content;
-        private const decimal BudgetStep = 500m;
 
         private void OnEnable()
         {
@@ -75,21 +74,10 @@ namespace StoreManager.UI
             var plan = dir.Plans.FirstOrDefault();
             var cands = GameApi.GetManagerCandidates(hq.Address);
 
-            // ── hire ──────────────────────────────────────────────────────────
-            UiKit.Spacer(_content, 4f);
-            var hire = UiKit.Row(_content.transform, false, 12f, 40f);
-            var hb = UiKit.Button(hire.transform, "storemanager_act_recruit".L("Hire a new Store Manager onto my HQ"), () =>
-            {
-                var r = RoleEmployees.Recruit(hq.Address);
-                Feedback.Toast(r.Ok ? Feedback.Level.Success : Feedback.Level.Warning,
-                    r.Ok ? "storemanager_notify_ok" : "storemanager_notify_blocked", D(r.Message));
-                Rebuild();
-            }, 40f, UiKit.AccentColor);
-            UiKit.Flexible(hb.gameObject);
-
-            UiKit.Label(_content, GameApi.RequireHqShift
-                ? "storemanager_bizmantab_shifthint".L("New hires need a desk shift here (BizMan → HQ → Schedule) before you can pick them.")
-                : "storemanager_bizmantab_assignhint".L("New hires need to be assigned to this HQ before you can pick them."),
+            // ── how to get a manager (recruit via the agency, then schedule) ───
+            UiKit.Spacer(_content, 2f);
+            UiKit.Label(_content,
+                "storemanager_bizmantab_recruithow".L("Recruit a Store Manager through your phone → Recruitment Agency (pick this HQ, skill \"Store Manager\"), then give them a desk shift in BizMan → HQ → Schedule. They'll show up below."),
                 12f, UiKit.MutedColor);
 
             // ── manager ───────────────────────────────────────────────────────
@@ -165,26 +153,31 @@ namespace StoreManager.UI
 
                 if (supervised && a != null)
                 {
-                    var lim = UiKit.Row(_content.transform, false, 8f, 34f);
-                    UiKit.FixedWidth(UiKit.Label(lim.transform, "storemanager_bizmantab_budget".L("Weekly budget"), 12f, UiKit.MutedColor).gameObject, 150f);
-                    Stepper(lim.transform, $"${a.WeeklyRestockBudgetCap:N0}", 96f,
-                        () => { dir.SetCap(plan.ManagerEmployeeId, a.StoreAddress, a.WeeklyRestockBudgetCap - BudgetStep); Rebuild(); },
-                        () => { dir.SetCap(plan.ManagerEmployeeId, a.StoreAddress, a.WeeklyRestockBudgetCap + BudgetStep); Rebuild(); });
-                    UiKit.FixedWidth(UiKit.Label(lim.transform, "storemanager_bizmantab_days".L("Stock buffer (days)"), 12f, UiKit.MutedColor).gameObject, 170f);
-                    Stepper(lim.transform, a.TargetDaysOfStock.ToString(), 44f,
-                        () => { dir.SetTargetDays(plan.ManagerEmployeeId, a.StoreAddress, a.TargetDaysOfStock - 1); Rebuild(); },
-                        () => { dir.SetTargetDays(plan.ManagerEmployeeId, a.StoreAddress, a.TargetDaysOfStock + 1); Rebuild(); });
+                    var assignment = a;
+                    var lim = UiKit.Row(_content.transform, false, 10f, 36f);
+
+                    UiKit.FixedWidth(UiKit.Label(lim.transform, "storemanager_bizmantab_budget".L("Weekly budget $"), 12f, UiKit.MutedColor).gameObject, 150f);
+                    UiKit.NumberField(lim.transform, ((long)assignment.WeeklyRestockBudgetCap).ToString(), 120f, s =>
+                    {
+                        if (TryParseAmount(s, out var v) && v != assignment.WeeklyRestockBudgetCap)
+                        { dir.SetCap(plan.ManagerEmployeeId, assignment.StoreAddress, v); Rebuild(); }
+                    });
+
+                    UiKit.FixedWidth(UiKit.Label(lim.transform, "storemanager_bizmantab_days".L("Stock buffer (days)"), 12f, UiKit.MutedColor).gameObject, 180f);
+                    UiKit.NumberField(lim.transform, assignment.TargetDaysOfStock.ToString(), 70f, s =>
+                    {
+                        if (int.TryParse(new string(s.Where(char.IsDigit).ToArray()), out var d) && d != assignment.TargetDaysOfStock)
+                        { dir.SetTargetDays(plan.ManagerEmployeeId, assignment.StoreAddress, d); Rebuild(); }
+                    });
                 }
             }
         }
 
-        private void Stepper(Transform parent, string value, float valueWidth, Action minus, Action plus)
+        private static bool TryParseAmount(string s, out decimal value)
         {
-            UiKit.FixedWidth(UiKit.Button(parent, "−", minus, 28f).gameObject, 36f);
-            var v = UiKit.Label(parent, value, 14f);
-            v.alignment = TextAlignmentOptions.Center;
-            UiKit.FixedWidth(v.gameObject, valueWidth);
-            UiKit.FixedWidth(UiKit.Button(parent, "+", plus, 28f).gameObject, 36f);
+            var digits = new string((s ?? "").Where(char.IsDigit).ToArray());
+            if (decimal.TryParse(digits, out value)) return true;
+            value = 0m; return false;
         }
 
         private static void Announce(ActionResult r)

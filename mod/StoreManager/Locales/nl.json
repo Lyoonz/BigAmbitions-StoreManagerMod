@@ -17,8 +17,9 @@
   "storemanager_bizmantab_supervising": "Onder toezicht ✓",
   "storemanager_bizmantab_atcap": "limiet bereikt",
   "storemanager_bizmantab_assign": "Toewijzen",
-  "storemanager_bizmantab_budget": "Weekbudget",
+  "storemanager_bizmantab_budget": "Weekbudget $",
   "storemanager_bizmantab_days": "Voorraadbuffer (dagen)",
+  "storemanager_bizmantab_recruithow": "Werf een filiaalmanager via je telefoon → Uitzendbureau (kies dit kantoor, skill \"Filiaalmanager\"), en rooster 'm daarna in op een bureau via BizMan → HQ → Rooster. Dan verschijnt-ie hieronder.",
 
   "storemanager_act_label": "Snelle acties",
   "storemanager_act_pick": "— kies een actie —",

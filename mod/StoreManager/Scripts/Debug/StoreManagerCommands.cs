@@ -49,7 +49,7 @@ namespace StoreManager.Debugging
             CommandHelper.AddCommand("StoreManager.SelfTest",
                 "End-to-end: inject a manager, adopt, assign a store with a contract, run the weekly pass, log before/after, undo. DO NOT SAVE after.", _selfTest);
             CommandHelper.AddCommand("StoreManager.Recruit",
-                "Hire a new Store Manager onto your HQ (custom skill). Then schedule + adopt them.", _recruit);
+                "TEST SHORTCUT: directly hire a Store Manager onto your HQ. Normally recruit via phone -> Recruitment Agency.", _recruit);
             CommandHelper.AddCommand("StoreManager.SafeRemove",
                 "Uninstall prep: re-skill every Store Manager to Purchasing Agent and drop all plans, so deleting the mod folder is safe.", _safeRemove);
         }

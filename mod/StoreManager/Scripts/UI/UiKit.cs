@@ -174,6 +174,41 @@ namespace StoreManager.UI
             return go;
         }
 
+        /// <summary>An editable numeric field. <paramref name="onCommit"/> gets the raw string on end-edit.</summary>
+        public static TMP_InputField NumberField(Transform parent, string value, float width, Action<string> onCommit, float height = 30f)
+        {
+            var go = Container("Field", parent);
+            var bg = go.AddComponent<Image>();
+            bg.color = new Color(1f, 1f, 1f, 0.12f);
+            var le = go.AddComponent<LayoutElement>();
+            le.minWidth = S(width); le.preferredWidth = S(width); le.flexibleWidth = 0;
+            le.minHeight = S(height); le.preferredHeight = S(height);
+
+            var textGo = Container("Text", go.transform);
+            var trt = Rect(textGo);
+            trt.anchorMin = Vector2.zero; trt.anchorMax = Vector2.one;
+            trt.offsetMin = new Vector2(12, 2); trt.offsetMax = new Vector2(-12, -2);
+            var txt = textGo.AddComponent<TextMeshProUGUI>();
+            var f = Font ?? TMP_Settings.defaultFontAsset;
+            if (f != null) txt.font = f;
+            txt.fontSize = S(14f);
+            txt.color = TextColor;
+            txt.alignment = TextAlignmentOptions.MidlineLeft;
+            txt.textWrappingMode = TextWrappingModes.NoWrap;
+            txt.overflowMode = TextOverflowModes.Ellipsis;
+
+            var field = go.AddComponent<TMP_InputField>();
+            field.targetGraphic = bg;
+            field.textComponent = txt;
+            field.textViewport = trt;
+            field.contentType = TMP_InputField.ContentType.IntegerNumber;
+            field.lineType = TMP_InputField.LineType.SingleLine;
+            field.text = value;
+            field.restoreOriginalTextOnEscape = true;
+            field.onEndEdit.AddListener(s => { try { onCommit(s); } catch (Exception e) { Debug.LogError("[StoreManager] field commit threw: " + e); } });
+            return field;
+        }
+
         public static void Flexible(GameObject go, float flexW = 1f)
         {
             var le = go.GetComponent<LayoutElement>() ?? go.AddComponent<LayoutElement>();
