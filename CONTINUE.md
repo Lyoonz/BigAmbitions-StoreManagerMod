@@ -61,8 +61,8 @@ The **Filiaalmanager** (Store Manager) role is fully working in-game. Remaining:
 
 A mod for the game **Big Ambitions** (Hovgaard Games, Steam appid 1331550) that adds a
 **Store Manager** you hire to run your shops' day-to-day: keeps them stocked via delivery
-contracts, within budgets you set, assigned to N stores. Community request (Discord: lilnyce,
-StuartArmour, Lyoon). Not related to any other repo.
+contracts, within budgets you set, assigned to N stores. Community request (from a Big Ambitions Discord
+discussion). Not related to any other repo.
 
 ## State (2026-09-01)
 
@@ -77,7 +77,7 @@ StuartArmour, Lyoon). Not related to any other repo.
 
 The game **auto-updated Build 3670 → 3672** mid-build. The `dotnet build build/CompileCheck.csproj`
 check compiles against the live DLLs, so it's the source of truth; the decompile in
-the in-game reflection dump is Build 3672 —
+it targets Build 3672 —
 re-verify any exact signature the compiler flags.
 
 ### v2 Phase 1 file map (all under `mod/StoreManager/Scripts/`)

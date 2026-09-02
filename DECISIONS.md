@@ -90,7 +90,7 @@ and the community asks.
 
 **Evidence.** No department concept visible in the SDK surface or example mods; `BusinessType`
 is the finest business-structure unit exposed. Building departments would be mod-invented from
-scratch. StuartArmour flagged it as "a bit much" himself.
+scratch. One of the requesters flagged it as "a bit much" themselves.
 
 ## D8 — Project lives as a standalone repo
 
