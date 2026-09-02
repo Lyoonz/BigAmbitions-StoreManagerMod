@@ -54,8 +54,13 @@ namespace StoreManager.Interop.Harmony
                     if (RecruitmentPatch.Resolve()) RecruitmentPatch.EnsurePatched(_harmony);
                 }
                 catch (Exception e) { Debug.LogError("[StoreManager] recruitment patch setup threw: " + e); }
+                try
+                {
+                    if (HqCardPatch.Resolve()) HqCardPatch.EnsurePatched(_harmony);
+                }
+                catch (Exception e) { Debug.LogError("[StoreManager] HQ card patch setup threw: " + e); }
 
-                if (Patched) Debug.Log($"[StoreManager] Harmony patches applied (GetData(Skill)={getDataSkill}, HQ tab={BizManTabPatch.Patched}, agency={RecruitmentPatch.Patched}).");
+                if (Patched) Debug.Log($"[StoreManager] Harmony patches applied (GetData(Skill)={getDataSkill}, HQ tab={BizManTabPatch.Patched}, agency={RecruitmentPatch.Patched}, hqcard={HqCardPatch.Patched}).");
                 else Debug.LogError("[StoreManager] Harmony patch incomplete: " + LastError);
                 return Patched;
             }

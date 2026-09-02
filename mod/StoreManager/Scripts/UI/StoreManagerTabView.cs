@@ -163,11 +163,15 @@ namespace StoreManager.UI
                         if (v != assignment.WeeklyRestockBudgetCap) { dir.SetCap(mgrId, assignment.StoreAddress, v); Rebuild(); }
                     });
 
-                    UiKit.FixedWidth(UiKit.Label(lim.transform, "storemanager_bizmantab_days".L("Stock buffer (days)"), 12f, UiKit.MutedColor).gameObject, 180f);
+                    UiKit.FixedWidth(UiKit.Label(lim.transform, "storemanager_bizmantab_days".L("Keep stock for … days"), 12f, UiKit.MutedColor).gameObject, 200f);
                     UiKit.Stepper(lim.transform, assignment.TargetDaysOfStock, 1, 1, 60, 70f, v =>
                     {
                         if (v != assignment.TargetDaysOfStock) { dir.SetTargetDays(mgrId, assignment.StoreAddress, (int)v); Rebuild(); }
                     });
+
+                    UiKit.Label(_content, "storemanager_bizmantab_dayshelp".L(
+                        "How many days of sales each shop keeps on the shelf. The manager orders toward that — within the weekly budget."),
+                        11f, UiKit.MutedColor);
                 }
             }
         }

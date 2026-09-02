@@ -81,7 +81,9 @@ namespace StoreManager.Runtime
             string agency = Interop.Harmony.RecruitmentPatch.Patched ? "agency OK"
                           : Interop.Harmony.RecruitmentPatch.Disabled != null ? "agency off (" + Interop.Harmony.RecruitmentPatch.Disabled + ")"
                           : "agency pending";
-            return $"Store Manager role: active — {desks}, {tab}, {agency}";
+            string card = Interop.Harmony.HqCardPatch.Patched ? "hq-card OK"
+                        : Interop.Harmony.HqCardPatch.Disabled != null ? "hq-card off" : "hq-card pending";
+            return $"Store Manager role: active — {desks}, {tab}, {agency}, {card}";
         }
     }
 }

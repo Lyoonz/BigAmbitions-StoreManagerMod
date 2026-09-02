@@ -1,0 +1,130 @@
+#nullable enable
+using System;
+using System.Linq;
+using HarmonyLib;
+using UnityEngine;
+using UnityEngine.UI;
+using Entities;
+using Helpers;
+using StoreManager.Runtime;
+using StoreManager.UI;
+using TMPro;
+
+namespace StoreManager.Interop.Harmony
+{
+    /// <summary>
+    /// Adds a "Filiaalmanagers" counter to the HQ card on the BizMan landing page — the row that
+    /// shows Prijsmanager / Logistiek / Inkoper / HR / Headhunter counts. Postfix on
+    /// <c>UI.Smartphone.Apps.BizMan.HeadquartersList.SetUpEntry(BuildingRegistration)</c>: clone the
+    /// live <c>EmployeeCounter/PurchasingAgents</c> button, count the HQ's <c>sm:skill_storemanager</c>
+    /// employees, and route its click to the mod tab. Fully guarded; failure just omits the counter.
+    /// </summary>
+    public static class HqCardPatch
+    {
+        public const string TypeName = "UI.Smartphone.Apps.BizMan.HeadquartersList";
+        private const string CounterId = "StoreManagers";
+        private const string AnchorId = "PurchasingAgents";
+
+        public static bool Patched { get; private set; }
+        public static string? Disabled { get; private set; }
+
+        private static Type? _t;
+
+        public static bool Resolve()
+        {
+            if (_t != null) return Disabled == null;
+            try
+            {
+                _t = AccessTools.TypeByName(TypeName);
+                if (_t == null) { Disabled = "HeadquartersList type not found"; return false; }
+                return true;
+            }
+            catch (Exception e) { Disabled = "resolve threw: " + e.Message; return false; }
+        }
+
+        public static void EnsurePatched(global::HarmonyLib.Harmony harmony)
+        {
+            if (Patched || _t == null || Disabled != null) return;
+            try
+            {
+                var target = AccessTools.Method(_t, "SetUpEntry");
+                if (target == null) { Disabled = "SetUpEntry not found"; return; }
+                harmony.Patch(target, postfix: new HarmonyMethod(typeof(HqCardPatch), nameof(SetUpEntry_Postfix)));
+                Patched = true;
+                Debug.Log("[StoreManager] HQ card counter patch applied.");
+            }
+            catch (Exception e) { Disabled = "patch threw: " + e.Message; }
+        }
+
+        private static void SetUpEntry_Postfix(BuildingRegistration __0)
+        {
+            try
+            {
+                if (!RoleSystemState.IsActive || __0 == null) return;
+                var hq = __0;
+
+                // The clone lives on the freshly-instantiated entry, which is the last child of the
+                // template's parent (HeadquartersList clones then SetActive(true) at the end).
+                var tpl = FindTemplate();
+                var entry = tpl != null && tpl.parent != null && tpl.parent.childCount > 0
+                    ? tpl.parent.GetChild(tpl.parent.childCount - 1)
+                    : null;
+                if (entry == null) return;
+
+                var counterRow = entry.Find("EmployeeCounter");
+                var anchor = counterRow?.Find(AnchorId);
+                if (counterRow == null || anchor == null) return;
+                if (counterRow.Find(CounterId) != null) return;   // already added
+
+                var clone = UnityEngine.Object.Instantiate(anchor.gameObject, counterRow);
+                clone.name = CounterId;
+                clone.transform.SetSiblingIndex(anchor.GetSiblingIndex() + 1);
+
+                // count sm:skill_storemanager employees assigned to this HQ
+                int count = 0;
+                try
+                {
+                    count = EmployeeHelper.GetEmployeeInstances(new EmployeeInstancesQueryInfo
+                    {
+                        withAssignedAddress = hq.Address,
+                        withSkills = new[] { SkillRegistry.StoreManagerSkill },
+                        excludeBeingReplaced = true,
+                    }).Count;
+                }
+                catch { }
+
+                var countLbl = clone.transform.Find("Count")?.GetComponent<TextMeshProUGUI>()
+                            ?? clone.GetComponentsInChildren<TextMeshProUGUI>(true).FirstOrDefault(x => x.name == "Count");
+                if (countLbl != null) countLbl.text = count.ToString();
+
+                // label / icon — set the visible caption if there's a localisation component
+                var loc = clone.GetComponentInChildren<Localizor.LanguageChangeEvent.TextLocalizationComponent>(true);
+                if (loc != null)
+                {
+                    try { loc.Key = "storemanager_bizmantab_menu"; } catch { }
+                    try { loc.SetValue(Loc.T("storemanager_bizmantab_menu", "Filiaalmanagers")); } catch { }
+                }
+
+                var btn = clone.GetComponent<Button>();
+                if (btn != null)
+                {
+                    btn.onClick.RemoveAllListeners();
+                    var addr = hq.Address;
+                    btn.onClick.AddListener(() => BizManTabPatch.OpenHqTab(addr));
+                }
+            }
+            catch (Exception e) { Debug.LogError("[StoreManager] HQ card postfix swallowed: " + e); }
+        }
+
+        private static Transform? FindTemplate()
+        {
+            try
+            {
+                var list = UnityEngine.Object.FindObjectOfType(_t!);
+                var f = AccessTools.Field(_t, "headquartersEntry");
+                return f?.GetValue(list) as Transform;
+            }
+            catch { return null; }
+        }
+    }
+}

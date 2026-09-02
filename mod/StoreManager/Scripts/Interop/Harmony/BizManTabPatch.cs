@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using HarmonyLib;
 using Localizor.LanguageChangeEvent;
@@ -85,6 +86,22 @@ namespace StoreManager.Interop.Harmony
             Disabled = why;
             Debug.LogError("[StoreManager] HQ BizMan tab disabled — " + why + " (panel + supervision still work).");
             return false;
+        }
+
+        /// <summary>Open the BizMan screen for <paramref name="hqAddress"/> on the Store Managers tab.</summary>
+        public static void OpenHqTab(object hqAddress)
+        {
+            try
+            {
+                var uisType = AccessTools.TypeByName("UIs");
+                var uis = uisType != null ? UnityEngine.Object.FindObjectOfType(uisType) : null;
+                var fullMenu = uis?.GetType().GetField("fullMenu")?.GetValue(uis);
+                var bizMan = fullMenu?.GetType().GetField("bizMan")?.GetValue(fullMenu);
+                var open = bizMan?.GetType().GetMethods()
+                    .FirstOrDefault(m => m.Name == "Open" && m.GetParameters().Length == 2);
+                open?.Invoke(bizMan, new object?[] { hqAddress, TabId });
+            }
+            catch (Exception e) { Debug.LogError("[StoreManager] OpenHqTab threw: " + e); }
         }
 
         // ── the postfix ─────────────────────────────────────────────────────────
