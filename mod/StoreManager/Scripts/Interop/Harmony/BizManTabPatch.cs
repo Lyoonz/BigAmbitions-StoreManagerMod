@@ -179,24 +179,43 @@ namespace StoreManager.Interop.Harmony
                     });
                 }
 
-                // content container — a plain RectTransform child of `containers`, named the tab id
+                // content container: clone the vanilla PurchasingAgents container to inherit its
+                // exact RectTransform + layout, then strip its scripts and children and host our view.
                 var protoC = containers.Find(AnchorTab);
-                var cGo = new GameObject(TabId, typeof(RectTransform));
-                var crt = cGo.GetComponent<RectTransform>();
-                crt.SetParent(containers, false);
-                if (protoC is RectTransform prt)
+                GameObject cGo;
+                if (protoC != null)
                 {
-                    crt.anchorMin = prt.anchorMin; crt.anchorMax = prt.anchorMax;
-                    crt.pivot = prt.pivot; crt.sizeDelta = prt.sizeDelta;
-                    crt.anchoredPosition = prt.anchoredPosition; crt.localScale = prt.localScale;
+                    cGo = UnityEngine.Object.Instantiate(protoC.gameObject, containers);
+                    cGo.name = TabId;
+                    cGo.SetActive(false);
+                    // remove every game MonoBehaviour on the clone (their Awake never ran while inactive)
+                    foreach (var comp in cGo.GetComponentsInChildren<MonoBehaviour>(true))
+                    {
+                        if (comp == null) continue;
+                        try { UnityEngine.Object.DestroyImmediate(comp); } catch { }
+                    }
+                    // clear child objects — keep only the root RectTransform
+                    for (int i = cGo.transform.childCount - 1; i >= 0; i--)
+                        UnityEngine.Object.DestroyImmediate(cGo.transform.GetChild(i).gameObject);
+
+                    // force full-stretch inside `containers` (all vanilla tab containers fill it)
+                    var rt = (RectTransform)cGo.transform;
+                    rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+                    rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
+                    rt.localScale = Vector3.one;
                 }
                 else
                 {
+                    cGo = new GameObject(TabId, typeof(RectTransform));
+                    var crt = cGo.GetComponent<RectTransform>();
+                    crt.SetParent(containers, false);
                     crt.anchorMin = Vector2.zero; crt.anchorMax = Vector2.one;
                     crt.offsetMin = Vector2.zero; crt.offsetMax = Vector2.zero;
+                    crt.localScale = Vector3.one;
+                    cGo.SetActive(false);
                 }
-                cGo.SetActive(false);
                 cGo.AddComponent<StoreManagerTabView>();
+                Debug.Log($"[StoreManager] tab container ready (cloned={protoC != null}).");
 
                 Debug.Log("[StoreManager] built HQ 'Store Managers' tab.");
                 return go.transform;

@@ -24,7 +24,12 @@ namespace StoreManager.UI
 
         private void OnEnable()
         {
-            try { Build(); }
+            try
+            {
+                Build();
+                var rt = (RectTransform)transform;
+                Debug.Log($"[StoreManager] tab view built. container rect={rt.rect.size} content children={(_content != null ? _content.childCount : -1)}");
+            }
             catch (Exception e) { Debug.LogError("[StoreManager] tab view build failed: " + e); }
         }
 
