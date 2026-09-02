@@ -46,13 +46,18 @@ Bottom line: keep a backup, and always Safe-uninstall before deleting the mod.
    %USERPROFILE%\AppData\LocalLow\Hovgaard Games\Big Ambitions\ModsLocal\StoreManager\
        StoreManager.dll
        Locales\  (en.json, nl.json)
-       Dependencies\  (0Harmony.dll + MonoMod/Cecil)
+       Dependencies\  (0Harmony.dll)
    ```
    (`AppData` is hidden — paste the path into the Explorer address bar.)
 4. Start the game. Options → Mods should list **Store Manager**.
 
-**Harmony note:** the mod bundles Harmony 2.10.2 in `Dependencies\`. If you run another mod that
-also bundles Harmony (e.g. *Lower Installation Fee*), that's fine — the game loads one shared copy.
+**Harmony note:** the mod bundles **Lib.Harmony 2.3.3** — the self-contained `0Harmony.dll`, no
+separate `MonoMod.*` / `Mono.Cecil.*` DLLs. If you run another mod that also bundles Harmony (e.g.
+*Lower Installation Fee*, which ships the same 2.3.3), that's fine — the game loads one shared copy
+and the API matches whichever wins. Do **not** swap in a HarmonyX build (the small `0Harmony.dll`
+that needs `MonoMod.*`/`Mono.Cecil.*` beside it): this mod calls `Harmony.Patch(…, ilmanipulator:)`
+and `UnpatchSelf()`, which exist only in Lib.Harmony 2.3+. On a mismatch the HQ tab, the
+Recruitment Agency skill entry and the HQ card counter silently fail to appear.
 
 ## How to use
 
@@ -107,8 +112,8 @@ your Big Ambitions build number, what you did, and — if something threw — th
 
 ## License
 
-[MIT](LICENSE). Unofficial fan-made mod — not affiliated with Hovgaard Games. Bundled
-dependencies (Harmony, MonoMod, Cecil) keep their own MIT licenses.
+[MIT](LICENSE). Unofficial fan-made mod — not affiliated with Hovgaard Games. The bundled
+dependency (Lib.Harmony) keeps its own MIT license.
 
 ---
 

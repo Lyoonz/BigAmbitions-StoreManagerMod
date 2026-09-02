@@ -31,6 +31,16 @@ method mid-call), see D2 — not a switch to BepInEx.
 **Decision.** If a runtime hook is unreachable by direct calls, ship `0Harmony.dll` as a flat
 managed DLL in the mod's `Dependencies/` folder and patch from inside the SDK mod.
 
+**Which build.** **Lib.Harmony 2.3.3** (`pardeike/Harmony`, from the `Lib.Harmony` NuGet package) —
+the self-contained ~2.2 MB `0Harmony.dll` with MonoMod/Cecil ILRepacked in. **Not HarmonyX** (the
+BepInEx fork, small `0Harmony.dll` + separate `MonoMod.*` / `Mono.Cecil.*`): the code binds to
+`Harmony.Patch(MethodBase, HarmonyMethod × 5)` with the trailing `ilmanipulator` parameter and to
+`Harmony.UnpatchSelf()`, both added in Lib.Harmony 2.3 and absent from HarmonyX 2.10.x. A build
+shipped HarmonyX 2.10.2 by mistake — the load-bearing `PatchAll` skill patches still applied, but
+`BizManTabPatch` / `RecruitmentPatch` / `HqCardPatch` threw `MissingMethodException` at setup, so
+the HQ "Store Managers" tab, the agency skill entry and the HQ card counter silently never
+appeared. Keep the bundled DLL in sync with *Lower Installation Fee*, which ships the same 2.3.3.
+
 **Evidence.** `ModValidator` rule 12: "The Dependencies folder must be flat with only `.dll` files"
 — third-party managed DLLs are an expected, validated case. Nothing in the validator restricts
 gameplay manipulation or method patching.

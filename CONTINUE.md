@@ -46,8 +46,10 @@ The **Filiaalmanager** (Store Manager) role is fully working in-game. Remaining:
   vanilla), `Runtime/RoleSystemState.cs` (kill-switch: Active/Disabled, structural self-check).
   `GameApi.ManagerSkill` flipped to `sm:skill_storemanager`; `RequireHqShift=false` (v1 — desks
   don't accept the skill yet, so the plan is active when the manager is just assigned to HQ).
-  Bundled `mod/StoreManager/Dependencies/` (Harmony 2.10.2 + MonoMod/Cecil, from the user's
-  LowerInstallationFee mod). Locales: `sm:skill_storemanager` → Store Manager/Filiaalmanager.
+  Bundled `mod/StoreManager/Dependencies/0Harmony.dll` = **Lib.Harmony 2.3.3** (self-contained,
+  same build LowerInstallationFee ships). Earlier builds wrongly bundled HarmonyX 2.10.2 +
+  MonoMod/Cecil, which lacks `Harmony.Patch(…, ilmanipulator:)` / `UnpatchSelf()` — see DECISIONS
+  D2. Locales: `sm:skill_storemanager` → Store Manager/Filiaalmanager.
   `ContractSnapshot`/`OriginalContract`/`PendingRestore` **kept** (working+tested — deferred cut).
 - **Next up**: **Team Leader** + departments (second native role — `sm:skill_teamleader`, a
   5-field `Department` record, flat pro-rata trim, as a drill-down section inside the same HQ tab).
