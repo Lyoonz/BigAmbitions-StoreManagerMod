@@ -12,13 +12,18 @@ using UnityEngine;
 namespace StoreManager.UI
 {
     /// <summary>
-    /// The panel under Options → Mods. Built only from ModOptions primitives (no Harmony, no
-    /// asset bundle). Re-registered — which live-rebuilds the panel — on every change.
+    /// The panel under Options → Mods. Built only from ModOptions primitives (no Harmony/bundle).
     ///
-    /// Note on the game's ModOptions: `AddButton`'s label renders as a left-side description and
-    /// the button caption is a fixed prefab placeholder ("YOUR TEXT HERE"), so one-shot actions
-    /// are driven from a dropdown instead — it picks the action, runs it, and resets on rebuild.
-    /// Slider value labels substitute `{value}`, not `{0}`.
+    /// Two things about the game's ModOptions that shape this code:
+    ///  1. Every control's OnValueChanged fires ONCE during render (to sync its initial state), and
+    ///     OptionsService.Register invokes that render synchronously. So a callback that always
+    ///     rebuilds = infinite recursion. Guards: `_building` re-entrancy flag + every callback is
+    ///     idempotent (no-op when the value already matches current state).
+    ///  2. Persistable controls (sliders/dropdowns) load a stored PlayerPrefs value on render, which
+    ///     would clobber the mod's own data. Every persistable id is suffixed with a per-rebuild
+    ///     generation so it never has a stored value and always starts from the value we pass.
+    /// AddButton's caption is a fixed prefab placeholder, so one-shot actions use a dropdown.
+    /// Slider value labels substitute `{value}`.
     /// </summary>
     public static class StoreManagerOptions
     {
@@ -26,6 +31,12 @@ namespace StoreManager.UI
         private static GlobalDefaults _defaults = GlobalDefaults.Default();
         private static ModContext? _ctx;
         private static string? _configureStore;
+
+        private static bool _building;
+        private static int _gen;
+
+        /// <summary>Diagnostic — how many times the panel has been rebuilt (probe checks this doesn't run away).</summary>
+        public static int RebuildCount { get; private set; }
 
         public static void Register(ModContext ctx, GlobalDefaults defaults)
         {
@@ -40,26 +51,41 @@ namespace StoreManager.UI
 
         public static void Rebuild()
         {
-            var o = new ModOptions().AddHeader("storemanager_options_header");
-            try { BuildBody(o); }
-            catch (Exception e) { Debug.LogError("[StoreManager] options build failed: " + e); }
-            try { OptionsService.Register(_modId, o); }
-            catch (Exception e) { Debug.LogError("[StoreManager] options register failed: " + e.Message); }
+            if (_building) return;                 // nested request during the synchronous render — ignore
+            _building = true;
+            _gen++;
+            RebuildCount++;
+            try
+            {
+                var o = new ModOptions().AddHeader("storemanager_options_header");
+                try { BuildBody(o); }
+                catch (Exception e) { Debug.LogError("[StoreManager] options build failed: " + e); }
+                try { OptionsService.Register(_modId, o); }   // fires OnChanged -> game renders synchronously here
+                catch (Exception e) { Debug.LogError("[StoreManager] options register failed: " + e.Message); }
+            }
+            finally { _building = false; }
         }
 
-        // ── actions dropdown (always available) ─────────────────────────────────
+        /// <summary>A callback asking for a rebuild. If we're mid-render, the current build already
+        /// reflects live state, so skip; otherwise rebuild now (its synchronous render is guarded).</summary>
+        private static void RequestRebuild()
+        {
+            if (!_building) Rebuild();
+        }
+
+        private static string Id(string baseId) => baseId + "_v" + _gen;
+
+        // ── actions ────────────────────────────────────────────────────────────
         private static readonly string[] ActionChoices =
         {
-            "storemanager_act_pick",
-            "storemanager_act_selftest",
-            "storemanager_act_status",
-            "storemanager_act_planweek",
+            "storemanager_act_pick", "storemanager_act_selftest", "storemanager_act_status", "storemanager_act_planweek",
         };
 
         private static void AddActions(ModOptions o)
         {
-            o.AddDropdown("sm_action", "storemanager_act_label", ActionChoices, 0, i =>
+            o.AddDropdown(Id("sm_action"), "storemanager_act_label", ActionChoices, 0, i =>
             {
+                if (_building || i <= 0) return;
                 var dir = Core.StoreManagerCityMod.Active;
                 switch (i)
                 {
@@ -67,11 +93,11 @@ namespace StoreManager.UI
                     case 2: Feedback.Toast(Feedback.Level.Info, "storemanager_notify_ok",
                                 D("msg", Debugging.StoreManagerCommands.StatusSummary())); break;
                     case 3:
-                        if (dir?.Plans.Count > 0) dir.RunWeeklyPlanning();
+                        if (dir != null && dir.Plans.Count > 0) dir.RunWeeklyPlanning();
                         else Feedback.Toast(Feedback.Level.Warning, "storemanager_notify_blocked", D("msg", "no Store Manager to run"));
                         break;
                 }
-                Rebuild();   // resets the dropdown to "— pick —"
+                RequestRebuild();   // fresh id -> dropdown returns to "— choose —"
             });
         }
 
@@ -92,57 +118,51 @@ namespace StoreManager.UI
 
             if (cands.Count == 0 && plan == null) { o.AddHeader("storemanager_opt_no_candidates"); AddDefaults(o); return; }
 
-            // manager picker
+            // ── manager picker ─────────────────────────────────────────────────
             o.AddSplitter().AddHeader("storemanager_opt_stores_header");
             var mgrLabels = new List<string> { "storemanager_opt_pick_manager" };
             mgrLabels.AddRange(cands.Select(c => c.ToString()));
+            string? currentMgr = plan?.ManagerEmployeeId;
             int mgrCurrent = 0;
-            if (plan != null)
+            if (currentMgr != null)
             {
-                var idx = cands.FindIndex(c => c.Id == plan.ManagerEmployeeId);
+                var idx = cands.FindIndex(c => c.Id == currentMgr);
                 mgrCurrent = idx >= 0 ? idx + 1 : 0;
             }
-            o.AddDropdown("sm_manager", "storemanager_opt_manager_label", mgrLabels.ToArray(), mgrCurrent, i =>
+            o.AddDropdown(Id("sm_manager"), "storemanager_opt_manager_label", mgrLabels.ToArray(), mgrCurrent, i =>
             {
-                if (i <= 0)
-                {
-                    if (plan != null) { dir.DropManager(plan.ManagerEmployeeId); Feedback.Toast(Feedback.Level.Info, "storemanager_notify_ok", D("msg", "Manager dropped.")); }
-                }
-                else
-                {
-                    var pick = cands[i - 1];
-                    if (plan == null || plan.ManagerEmployeeId != pick.Id)
-                    {
-                        if (plan != null) dir.DropManager(plan.ManagerEmployeeId);
-                        Announce(dir.AdoptManager(hq.Address, pick.Id));
-                    }
-                }
+                if (_building) return;
+                string? desired = (i >= 1 && i - 1 < cands.Count) ? cands[i - 1].Id : null;
+                if (desired == currentMgr) return;                  // idempotent — no real change
+                if (currentMgr != null) dir.DropManager(currentMgr);
+                if (desired != null) Announce(dir.AdoptManager(hq.Address, desired));
+                else Feedback.Toast(Feedback.Level.Info, "storemanager_notify_ok", D("msg", "Manager dropped."));
                 _configureStore = null;
-                Rebuild();
+                RequestRebuild();
             });
 
             if (plan == null) { AddDefaults(o); return; }
 
-            // supervised-store toggles
+            // ── supervised-store toggles ──────────────────────────────────────
             int cap = GameApi.MaxStores(plan.HqAddress, plan.ManagerEmployeeId);
-            var stores = GameApi.GetSupervisableStores();
-            foreach (var s in stores)
+            foreach (var s in GameApi.GetSupervisableStores())
             {
-                bool supervised = plan.Supervises(s.Address);
                 string addr = s.Address;
+                bool supervised = plan.Supervises(addr);
                 bool atCap = !supervised && plan.Assignments.Count >= cap;
                 string label = s.Name + (atCap ? "  (skill cap reached)" : "")
                                        + (!DeliveryContracts.HasContract(addr) ? "  (no delivery contract)" : "");
-                o.AddToggle("sm_store_" + Sanitize(addr), label, supervised, on =>
+                o.AddToggle(Id("sm_store_" + Sanitize(addr)), label, supervised, on =>
                 {
+                    if (_building || on == plan.Supervises(addr)) return;   // idempotent
                     if (on) Announce(dir.AssignStore(plan.ManagerEmployeeId, addr));
                     else Announce(dir.UnassignStore(plan.ManagerEmployeeId, addr));
                     if (!on && _configureStore == addr) _configureStore = null;
-                    Rebuild();
+                    RequestRebuild();
                 });
             }
 
-            // per-store config
+            // ── per-store limits ──────────────────────────────────────────────
             if (plan.Assignments.Count > 0)
             {
                 o.AddSplitter().AddHeader("storemanager_opt_config_header");
@@ -154,23 +174,27 @@ namespace StoreManager.UI
                     var idx = plan.Assignments.FindIndex(a => a.StoreAddress == _configureStore);
                     cfgCurrent = idx >= 0 ? idx + 1 : 0;
                 }
-                o.AddDropdown("sm_cfg_store", "storemanager_opt_config_label", cfgLabels.ToArray(), cfgCurrent, i =>
+                o.AddDropdown(Id("sm_cfg_store"), "storemanager_opt_config_label", cfgLabels.ToArray(), cfgCurrent, i =>
                 {
-                    _configureStore = i <= 0 ? null : plan.Assignments[i - 1].StoreAddress;
-                    Rebuild();
+                    if (_building) return;
+                    string? sel = (i >= 1 && i - 1 < plan.Assignments.Count) ? plan.Assignments[i - 1].StoreAddress : null;
+                    if (sel == _configureStore) return;               // idempotent
+                    _configureStore = sel;
+                    RequestRebuild();
                 });
 
                 var target = _configureStore != null ? plan.Find(_configureStore) : null;
                 if (target != null)
                 {
-                    o.AddSlider("sm_cfg_budget", "storemanager_opt_def_budget", 0, 30000,
-                        (int)target.WeeklyRestockBudgetCap,
-                        v => dir.SetCap(plan.ManagerEmployeeId, target.StoreAddress, v), "storemanager_opt_money_suffix");
-                    o.AddSlider("sm_cfg_days", "storemanager_opt_def_days", 1, 30,
-                        target.TargetDaysOfStock,
-                        v => dir.SetTargetDays(plan.ManagerEmployeeId, target.StoreAddress, v), "storemanager_opt_days_suffix");
-                    o.AddDropdown("sm_cfg_staffing", "storemanager_opt_def_staffing", StaffingChoices,
-                        (int)target.Staffing, i => { target.Staffing = (StaffingLevel)i; dir.Save(); });
+                    var t = target;
+                    o.AddSlider(Id("sm_cfg_budget"), "storemanager_opt_def_budget", 0, 30000, (int)t.WeeklyRestockBudgetCap,
+                        v => { if (!_building && v != (int)t.WeeklyRestockBudgetCap) dir.SetCap(plan.ManagerEmployeeId, t.StoreAddress, v); },
+                        "storemanager_opt_money_suffix");
+                    o.AddSlider(Id("sm_cfg_days"), "storemanager_opt_def_days", 1, 30, t.TargetDaysOfStock,
+                        v => { if (!_building && v != t.TargetDaysOfStock) dir.SetTargetDays(plan.ManagerEmployeeId, t.StoreAddress, v); },
+                        "storemanager_opt_days_suffix");
+                    o.AddDropdown(Id("sm_cfg_staffing"), "storemanager_opt_def_staffing", StaffingChoices, (int)t.Staffing,
+                        i => { if (!_building && i != (int)t.Staffing) { t.Staffing = (StaffingLevel)i; dir.Save(); } });
                 }
             }
 
@@ -183,12 +207,12 @@ namespace StoreManager.UI
         private static void AddDefaults(ModOptions o)
         {
             o.AddSplitter().AddHeader("storemanager_opt_defaults_header");
-            o.AddSlider("sm_def_budget", "storemanager_opt_def_budget", 0, 30000,
-                (int)_defaults.WeeklyRestockBudgetCap, v => _defaults.WeeklyRestockBudgetCap = v, "storemanager_opt_money_suffix");
-            o.AddSlider("sm_def_days", "storemanager_opt_def_days", 1, 30,
-                _defaults.TargetDaysOfStock, v => _defaults.TargetDaysOfStock = v, "storemanager_opt_days_suffix");
-            o.AddDropdown("sm_def_staffing", "storemanager_opt_def_staffing", StaffingChoices,
-                (int)_defaults.Staffing, i => _defaults.Staffing = (StaffingLevel)i);
+            o.AddSlider(Id("sm_def_budget"), "storemanager_opt_def_budget", 0, 30000, (int)_defaults.WeeklyRestockBudgetCap,
+                v => { if (!_building) _defaults.WeeklyRestockBudgetCap = v; }, "storemanager_opt_money_suffix");
+            o.AddSlider(Id("sm_def_days"), "storemanager_opt_def_days", 1, 30, _defaults.TargetDaysOfStock,
+                v => { if (!_building) _defaults.TargetDaysOfStock = v; }, "storemanager_opt_days_suffix");
+            o.AddDropdown(Id("sm_def_staffing"), "storemanager_opt_def_staffing", StaffingChoices, (int)_defaults.Staffing,
+                i => { if (!_building) _defaults.Staffing = (StaffingLevel)i; });
             o.AddSplitter();
         }
 

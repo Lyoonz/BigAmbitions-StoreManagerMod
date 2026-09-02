@@ -118,7 +118,56 @@ namespace StoreManagerProbe
             yield return new WaitForSeconds(5f);
             try { DumpLiveSave(); } catch (Exception e) { L("dump threw: " + e); }
             yield return new WaitForSeconds(2f);
+            try { ExercisePanel(); } catch (Exception e) { L("panel exercise threw: " + e); }
+            yield return new WaitForSeconds(1f);
             try { InvokeSelfTest(); } catch (Exception e) { L("selftest invoke threw: " + e); }
+        }
+
+        /// <summary>
+        /// Rebuild the options panel, then simulate the game re-invoking every control's
+        /// OnValueChanged with its current value (what the game does on every render / OnEnable).
+        /// If the panel recurses, RebuildCount runs away and this logs a FAIL.
+        /// </summary>
+        private void ExercisePanel()
+        {
+            var optType = TypeByName("StoreManager.UI.StoreManagerOptions");
+            var svc = TypeByName("BigAmbitions.Mods.OptionsService");
+            if (optType == null || svc == null) { L("PANEL: types not found (mod not loaded?)"); return; }
+
+            var rebuild = optType.GetMethod("Rebuild", BindingFlags.Public | BindingFlags.Static);
+            var countProp = optType.GetProperty("RebuildCount", BindingFlags.Public | BindingFlags.Static);
+            var entriesProp = svc.GetProperty("RegisteredEntries", BindingFlags.Public | BindingFlags.Static);
+
+            rebuild?.Invoke(null, null);
+            int c0 = (int)(countProp?.GetValue(null) ?? 0);
+
+            // pull the registered ModOptions for "StoreManager" and invoke each control's action
+            var entries = entriesProp?.GetValue(null) as System.Collections.IEnumerable;
+            int invoked = 0;
+            if (entries != null)
+            {
+                foreach (var kv in entries)
+                {
+                    var kvt = kv.GetType();
+                    var key = kvt.GetProperty("Key")?.GetValue(kv) as string;
+                    if (key != "StoreManager") continue;
+                    var opts = kvt.GetProperty("Value")?.GetValue(kv);
+                    var list = opts?.GetType().GetProperty("Options")?.GetValue(opts) as System.Collections.IEnumerable;
+                    if (list == null) continue;
+                    foreach (var opt in list)
+                    {
+                        var ot = opt.GetType();
+                        // dropdowns / sliders: OnValueChanged is Action<int>; fire with a plausible current value
+                        var ovc = ot.GetProperty("OnValueChanged")?.GetValue(opt);
+                        if (ovc is Action<int> ai) { try { ai(0); invoked++; } catch (Exception e) { L("  ctrl int cb threw: " + e.Message); } }
+                        var ocl = ot.GetProperty("OnClick")?.GetValue(opt);
+                        if (ocl is Action a0) { try { a0(); invoked++; } catch (Exception e) { L("  ctrl click cb threw: " + e.Message); } }
+                    }
+                }
+            }
+            int c1 = (int)(countProp?.GetValue(null) ?? 0);
+            L($"PANEL: rebuilt, invoked {invoked} control callback(s). RebuildCount {c0} -> {c1}  " +
+              ((c1 - c0) <= 2 ? "PASS (no recursion)" : "FAIL — panel is recursing"));
         }
 
         private void DumpLiveSave()
@@ -190,6 +239,11 @@ namespace StoreManagerProbe
             L("SelfTest: invoking — output on [StoreManager] lines");
             m.Invoke(null, null);
         }
+
+        private static Type? TypeByName(string full) =>
+            AppDomain.CurrentDomain.GetAssemblies()
+                .SelectMany(a => { try { return a.GetTypes(); } catch { return Array.Empty<Type>(); } })
+                .FirstOrDefault(t => t.FullName == full);
 
         private static string SafeSkill(EmployeeInstance e, string k)
         { try { return e.HasSkill(k) ? e.GetSkillValue(k).ToString("0") : "-"; } catch { return "?"; } }
