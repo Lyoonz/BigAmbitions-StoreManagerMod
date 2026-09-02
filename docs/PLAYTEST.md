@@ -8,23 +8,23 @@ To rebuild after a code change: `bash build/deploy-local.sh` (needs .NET SDK), t
 
 ---
 
-## Quick check (console) — 30 seconds
+## Quick check — no console needed — 30 seconds
 
-1. **Enable the debug console.** Steam → Big Ambitions → ⚙ Properties → *Launch Options* → type:
-   `-console`
-2. Launch, load a save that has an **office (Headquarters)** and at least one **shop with a
-   wholesale delivery contract** (your day-125 save: *Foundation Headquarters* + *The Signature Mart*).
-3. Press the **`` ` ``** key (backtick, left of `1`) to open the console. Type:
-   ```
-   StoreManager.SelfTest
-   ```
-   It injects a temporary Purchasing Agent, assigns a shop, runs one weekly restock pass, prints
-   the delivery contract before/after, then undoes everything.
-4. **Do not save the game after SelfTest** (a throwaway employee was briefly in memory). Your
-   real saves are never written by it.
+1. Launch the game, load a save that has an **office (Headquarters)** and at least one **shop
+   with a wholesale delivery contract** (your day-125 save: *Foundation Headquarters* +
+   *The Signature Mart*).
+2. **Esc → Settings → Mods → Store Manager**.
+3. Click **"Run self-test"**. It injects a temporary Purchasing Agent, assigns a shop, runs one
+   weekly restock pass, restores everything, and shows the result as a toast + a message from the
+   "Store Manager" phone contact — e.g.
+   *"PASS: The Signature Mart restocked ($7,681/wk, 8 lines), contract restored exactly."*
+4. **Don't save the game right after** the self-test (a throwaway employee was briefly in memory).
+   Your real saves are never written.
 
-Other console commands: `StoreManager.Managers`, `.Adopt <n>`, `.Stores`, `.Assign <n>`,
-`.SetCap <n> <amount>`, `.Days <n> <days>`, `.Status`, `.PlanWeek`, `.Drop`.
+**The debug console is optional** — if you want it, add `-console` to the Steam launch options
+and press `` ` `` in-game (it's finicky and can stop the game loading; the panel button does the
+same job). Console commands: `StoreManager.Managers / .Adopt <n> / .Stores / .Assign <n> /
+.SetCap <n> <amt> / .Days <n> <d> / .Status / .PlanWeek / .Drop / .SelfTest`.
 
 ---
 
