@@ -1,6 +1,34 @@
 # CONTINUE — pick up here (fresh Claude session / new machine)
 
-Read this first, then `docs/DESIGN-v2.md`, then `DECISIONS.md`.
+Read this first, then `docs/DESIGN-v3.md`, then `DECISIONS.md` (esp. D15).
+
+## State (2026-09-02) — v3 Phase A coded
+
+v2 (`ba:skill_purchasingagent` reuse) passed its in-game SelfTest. The user then rejected reuse:
+they want **two genuinely new native roles** — Filiaalmanager + Team Leader. See `docs/DESIGN-v3.md`
+and D15.
+
+- **Skill probe** (`probe/StoreManagerProbe/SKILL-PROBE.md`, run 2026-09-02): runtime `SkillData` +
+  `BuildTagCache()` are safe; a mod-skill **primary** bricks a folder-deleted save (load-time
+  compat-fix NPE); vanilla managers `baseHourlyWage=30` with a ~0.5 mult. User accepts the
+  save-risk → **Option 1** (skills[0] = sm:skill_storemanager, title shows "Filiaalmanager"),
+  cheap uninstall safety only, `baseHourlyWage=46`.
+- **Phase A coded** (compiles 0/0): `Interop/Harmony/HarmonyBootstrap.cs`,
+  `Interop/Harmony/SkillHelperPatches.cs` (prefix on `OnSkillDataLoaded` + postfix on both
+  `GetData`), `Interop/SkillRegistry.cs` (runtime SkillData, inject into `SkillHelper.Skills`),
+  `Interop/RoleEmployees.cs` (recruit via `GenerateCandidate`+`HireCandidate`, re-skill to
+  vanilla), `Runtime/RoleSystemState.cs` (kill-switch: Active/Disabled, structural self-check).
+  `GameApi.ManagerSkill` flipped to `sm:skill_storemanager`; `RequireHqShift=false` (v1 — desks
+  don't accept the skill yet, so the plan is active when the manager is just assigned to HQ).
+  Bundled `mod/StoreManager/Dependencies/` (Harmony 2.10.2 + MonoMod/Cecil, from the user's
+  LowerInstallationFee mod). Locales: `sm:skill_storemanager` → Store Manager/Filiaalmanager.
+  `ContractSnapshot`/`OriginalContract`/`PendingRestore` **kept** (working+tested — deferred cut).
+- **Next: the one in-game test** — `docs/PHASE-A-TEST.md`. Probe + mod deployed. If green, then
+  the deferred list in `docs/DESIGN-v3.md` (Team Leader, HQ BizMan tab, desk `suitableSkills`).
+
+---
+
+## (historical) Read this first, then `docs/DESIGN-v2.md`, then `DECISIONS.md`.
 
 ## What this is
 
