@@ -17,6 +17,8 @@
   "storemanager_bizmantab_supervising": "Onder toezicht ✓",
   "storemanager_bizmantab_atcap": "limiet bereikt",
   "storemanager_bizmantab_assign": "Toewijzen",
+  "storemanager_bizmantab_budget": "Weekbudget",
+  "storemanager_bizmantab_days": "Voorraadbuffer (dagen)",
 
   "storemanager_act_label": "Snelle acties",
   "storemanager_act_pick": "— kies een actie —",
@@ -30,7 +32,7 @@
   "storemanager_opt_no_hq": "Huur eerst een kantoor (Headquarters) — de manager werkt daarvandaan.",
   "storemanager_opt_role_disabled": "De Filiaalmanager-rol is uitgeschakeld op deze game-versie — toezicht is gepauzeerd en er gaat geen data verloren. Bestaande plannen laden alleen-lezen.",
   "storemanager_opt_recruit_hint": "Nog geen filiaalmanager. Gebruik \"Nieuwe filiaalmanager inhuren op mijn kantoor\" hierboven, rooster 'm daarna in op een kantoorplek en kies 'm hieronder.",
-  "storemanager_opt_hqtab_hint": "Je kunt dit ook regelen via het tabblad \"Filiaalmanagers\" in het BizMan-scherm van je kantoor — net als Purchasing Agents / HR / Logistiek.",
+  "storemanager_opt_hqtab_hint": "Beheer je filiaalmanagers via het tabblad \"Filiaalmanagers\" in het BizMan-scherm van je kantoor (naast Inkoopagenten / HR). Dit paneel houdt alleen de standaardwaarden en de snelle acties hierboven.",
   "storemanager_opt_no_candidates": "Nog geen filiaalmanager op je kantoor. Huur er een via de snelle actie hierboven, wijs 'm toe aan je kantoor en geef 'm een dienst — dan verschijnt-ie hier.",
   "storemanager_opt_pick_manager": "— kies een manager —",
   "storemanager_opt_manager_label": "Filiaalmanager",

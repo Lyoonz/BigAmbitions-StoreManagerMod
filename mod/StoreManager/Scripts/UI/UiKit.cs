@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Reflection;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -7,9 +8,9 @@ using UnityEngine.UI;
 namespace StoreManager.UI
 {
     /// <summary>
-    /// Minimal runtime-uGUI builders for the HQ BizMan tab content. Deliberately plain — no
-    /// prefab/bundle dependency. Typography and colours are lifted from a donor vanilla
-    /// <see cref="TMP_Text"/> (a cloned menu button) so it blends in without guessing font assets.
+    /// Runtime-uGUI builders for the HQ BizMan tab. No prefab/bundle dependency. Font comes from a
+    /// donor vanilla <see cref="TMP_Text"/> (a cloned menu button); the colour palette is read from
+    /// the game's own <c>Colors</c> singleton so the tab matches Purchasing Agents / HR / Logistics.
     /// </summary>
     public static class UiKit
     {
@@ -18,34 +19,54 @@ namespace StoreManager.UI
         private static float S(float v) => v * Scale;
 
         public static TMP_FontAsset? Font;
-        public static Color TextColor = new(0.93f, 0.93f, 0.93f);
-        public static Color MutedColor = new(0.62f, 0.64f, 0.68f);
-        public static Color AccentColor = new(0.20f, 0.55f, 0.90f);
-        public static Color PanelColor = new(1f, 1f, 1f, 0.05f);
-        public static Color ButtonColor = new(1f, 1f, 1f, 0.12f);
+
+        // palette — sensible defaults, overwritten from the game's Colors singleton in AdoptStyleFrom
+        public static Color TextColor = new(0.94f, 0.95f, 0.97f);
+        public static Color MutedColor = new(0.78f, 0.80f, 0.84f);
+        public static Color HeaderColor = new(1f, 1f, 1f);
+        public static Color AccentColor = new(0.16f, 0.53f, 0.92f);   // vanilla blue
+        public static Color DisabledColor = new(1f, 1f, 1f, 0.10f);
+        public static Color RowColor = new(1f, 1f, 1f, 0.05f);
+        public static Color RuleColor = new(1f, 1f, 1f, 0.16f);
 
         public static void AdoptStyleFrom(TMP_Text? donor)
         {
             if (donor != null)
             {
-                try
-                {
-                    if (donor.font != null) Font = donor.font;
-                    TextColor = donor.color;
-                }
-                catch { }
+                try { if (donor.font != null) Font = donor.font; } catch { }
             }
-            if (Font == null)
-            {
-                try { Font = TMP_Settings.defaultFontAsset; } catch { }
-            }
+            if (Font == null) { try { Font = TMP_Settings.defaultFontAsset; } catch { } }
+
+            // pull the game's own colours (global type `Colors`, static Color32 props)
+            TryColor("White", ref HeaderColor);
+            TryColor("LightGrey", ref MutedColor);
+            TryColor("Blue", ref AccentColor);
+            var text = TextColor; TryColor("White", ref text); TextColor = text;
         }
 
-        public static RectTransform Rect(GameObject go)
+        private static void TryColor(string prop, ref Color into)
         {
-            var rt = go.GetComponent<RectTransform>() ?? go.AddComponent<RectTransform>();
-            return rt;
+            try
+            {
+                var t = Type.GetType("Colors, BigAmbitions") ?? FindGlobal("Colors");
+                var p = t?.GetProperty(prop, BindingFlags.Public | BindingFlags.Static);
+                if (p?.GetValue(null) is Color32 c) into = c;
+            }
+            catch { }
         }
+
+        private static Type? FindGlobal(string name)
+        {
+            foreach (var a in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                try { var t = a.GetType(name); if (t != null) return t; } catch { }
+            }
+            return null;
+        }
+
+        // ── structure ───────────────────────────────────────────────────────────
+        public static RectTransform Rect(GameObject go) =>
+            go.GetComponent<RectTransform>() ?? go.AddComponent<RectTransform>();
 
         public static GameObject Container(string name, Transform parent)
         {
@@ -54,14 +75,9 @@ namespace StoreManager.UI
             return go;
         }
 
-        /// <summary>
-        /// A plain vertical column (no scrolling) inset from its parent by (left, top, right).
-        /// Returns the transform to fill. Insets clear the BizMan menu bar (top) and the floating
-        /// business-info card (left).
-        /// </summary>
-        public static RectTransform Column(Transform parent, float left = 560f, float top = 40f, float right = 40f, float spacing = 12f)
+        /// <summary>Vertical column inset from its parent (clears the menu bar + the info card).</summary>
+        public static RectTransform Column(Transform parent, float left = 560f, float top = 30f, float right = 48f, float spacing = 10f)
         {
-            // fixed inset frame
             var frame = Container("SM_Panel", parent);
             var frt = Rect(frame);
             frt.anchorMin = Vector2.zero; frt.anchorMax = Vector2.one;
@@ -69,58 +85,22 @@ namespace StoreManager.UI
             frt.offsetMax = new Vector2(-right, -top);
             frt.localScale = Vector3.one;
 
-            // column that grows downward from the frame's top
             var col = Container("Col", frame.transform);
             var crt = Rect(col);
             crt.anchorMin = new Vector2(0, 1); crt.anchorMax = new Vector2(1, 1); crt.pivot = new Vector2(0.5f, 1f);
-            crt.offsetMin = new Vector2(0, 0); crt.offsetMax = new Vector2(0, 0);
+            crt.offsetMin = Vector2.zero; crt.offsetMax = Vector2.zero;
             crt.localScale = Vector3.one;
 
             var vlg = col.AddComponent<VerticalLayoutGroup>();
             vlg.spacing = S(spacing);
-            vlg.padding = new RectOffset(0, 0, 0, 0);
             vlg.childControlWidth = true; vlg.childControlHeight = true;
             vlg.childForceExpandWidth = true; vlg.childForceExpandHeight = false;
             vlg.childAlignment = TextAnchor.UpperLeft;
-            var fit = col.AddComponent<ContentSizeFitter>();
-            fit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            col.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             return crt;
         }
 
-        /// <summary>A vertical scroll view. Returns the Content transform to fill.</summary>
-        public static RectTransform ScrollColumn(Transform parent, float spacing = 8f, int pad = 16)
-        {
-            var viewport = Container("Viewport", parent);
-            var vrt = Rect(viewport);
-            vrt.anchorMin = Vector2.zero; vrt.anchorMax = Vector2.one;
-            vrt.offsetMin = Vector2.zero; vrt.offsetMax = Vector2.zero;
-            var vpImg = viewport.AddComponent<Image>(); vpImg.color = new Color(0, 0, 0, 0.001f);
-            viewport.AddComponent<Mask>().showMaskGraphic = false;
-
-            var content = Container("Content", viewport.transform);
-            var crt = Rect(content);
-            crt.anchorMin = new Vector2(0, 1); crt.anchorMax = new Vector2(1, 1); crt.pivot = new Vector2(0.5f, 1f);
-            crt.offsetMin = new Vector2(0, 0); crt.offsetMax = new Vector2(0, 0);
-
-            var vlg = content.AddComponent<VerticalLayoutGroup>();
-            vlg.spacing = spacing;
-            vlg.padding = new RectOffset(pad, pad, pad, pad);
-            vlg.childControlWidth = true; vlg.childControlHeight = true;
-            vlg.childForceExpandWidth = true; vlg.childForceExpandHeight = false;
-            var fitter = content.AddComponent<ContentSizeFitter>();
-            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-            var sr = (parent.GetComponent<ScrollRect>() ?? parent.gameObject.AddComponent<ScrollRect>());
-            sr.viewport = vrt;
-            sr.content = crt;
-            sr.horizontal = false;
-            sr.vertical = true;
-            sr.movementType = ScrollRect.MovementType.Clamped;
-            sr.scrollSensitivity = 20f;
-            return crt;
-        }
-
-        public static TextMeshProUGUI Label(Transform parent, string text, float size = 18f, Color? color = null, FontStyles style = FontStyles.Normal)
+        public static TextMeshProUGUI Label(Transform parent, string text, float size = 15f, Color? color = null, FontStyles style = FontStyles.Normal)
         {
             var go = Container("Label", parent);
             var t = go.AddComponent<TextMeshProUGUI>();
@@ -131,35 +111,61 @@ namespace StoreManager.UI
             t.color = color ?? TextColor;
             t.fontStyle = style;
             t.textWrappingMode = TextWrappingModes.Normal;
-            var le = go.AddComponent<LayoutElement>();
-            le.minHeight = S(size) + 8f;
+            go.AddComponent<LayoutElement>().minHeight = S(size) + 10f;
             return t;
         }
 
-        public static Button Button(Transform parent, string text, Action onClick, float height = 34f, Color? bg = null)
+        /// <summary>Vanilla-style section header: an uppercase label with a thin rule to its right.</summary>
+        public static void SectionHeader(Transform parent, string text)
+        {
+            Spacer(parent, 6f);
+            var row = Container("Section", parent);
+            var hlg = row.AddComponent<HorizontalLayoutGroup>();
+            hlg.spacing = S(12f);
+            hlg.childControlWidth = true; hlg.childControlHeight = true;
+            hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = false;
+            hlg.childAlignment = TextAnchor.MiddleLeft;
+            row.AddComponent<LayoutElement>().minHeight = S(26f);
+
+            var lab = Label(row.transform, text.ToUpperInvariant(), 13f, MutedColor, FontStyles.Bold);
+            lab.characterSpacing = 6f;
+            lab.GetComponent<LayoutElement>().flexibleWidth = 0;
+
+            var rule = Container("Rule", row.transform);
+            rule.AddComponent<Image>().color = RuleColor;
+            var rle = rule.AddComponent<LayoutElement>();
+            rle.minHeight = 2f; rle.preferredHeight = 2f; rle.flexibleWidth = 1f;
+        }
+
+        public static Button Button(Transform parent, string text, Action onClick, float height = 30f, Color? bg = null, bool enabled = true)
         {
             var go = Container("Button", parent);
             var img = go.AddComponent<Image>();
-            img.color = bg ?? ButtonColor;
+            img.color = enabled ? (bg ?? DisabledColor) : DisabledColor;
             var b = go.AddComponent<Button>();
             b.targetGraphic = img;
-            b.onClick.AddListener(() => { try { onClick(); } catch (Exception e) { Debug.LogError("[StoreManager] tab button threw: " + e); } });
+            b.interactable = enabled;
+            if (enabled)
+                b.onClick.AddListener(() => { try { onClick(); } catch (Exception e) { Debug.LogError("[StoreManager] tab button threw: " + e); } });
             var le = go.AddComponent<LayoutElement>();
             le.minHeight = S(height); le.preferredHeight = S(height);
 
-            var label = Label(go.transform, text, 15f, TextColor, FontStyles.Normal);
+            var label = Label(go.transform, text, 14f, enabled ? Color.white : MutedColor);
             label.alignment = TextAlignmentOptions.Center;
             var lrt = Rect(label.gameObject);
             lrt.anchorMin = Vector2.zero; lrt.anchorMax = Vector2.one;
-            lrt.offsetMin = new Vector2(16, 0); lrt.offsetMax = new Vector2(-16, 0);
+            lrt.offsetMin = new Vector2(18, 0); lrt.offsetMax = new Vector2(-18, 0);
             return b;
         }
 
-        public static GameObject Row(Transform parent, float spacing = 10f, float height = 34f)
+        /// <summary>A horizontal row with a subtle card background (matches vanilla list entries).</summary>
+        public static GameObject Row(Transform parent, bool card = false, float spacing = 12f, float height = 40f)
         {
             var go = Container("Row", parent);
+            if (card) { var bg = go.AddComponent<Image>(); bg.color = RowColor; bg.raycastTarget = false; }
             var hlg = go.AddComponent<HorizontalLayoutGroup>();
             hlg.spacing = S(spacing);
+            hlg.padding = card ? new RectOffset((int)S(14), (int)S(14), 0, 0) : new RectOffset(0, 0, 0, 0);
             hlg.childControlWidth = true; hlg.childControlHeight = true;
             hlg.childForceExpandWidth = false; hlg.childForceExpandHeight = false;
             hlg.childAlignment = TextAnchor.MiddleLeft;
@@ -180,11 +186,8 @@ namespace StoreManager.UI
             le.minWidth = S(w); le.preferredWidth = S(w); le.flexibleWidth = 0;
         }
 
-        public static void Spacer(Transform parent, float h = 6f)
-        {
-            var go = Container("Spacer", parent);
-            go.AddComponent<LayoutElement>().minHeight = S(h);
-        }
+        public static void Spacer(Transform parent, float h = 6f) =>
+            Container("Spacer", parent).AddComponent<LayoutElement>().minHeight = S(h);
 
         public static void Clear(Transform t)
         {

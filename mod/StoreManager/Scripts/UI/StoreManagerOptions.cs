@@ -133,9 +133,21 @@ namespace StoreManager.UI
             AddActions(o);
 
             if (!RoleSystemState.IsActive)
+            {
                 o.AddHeader("storemanager_opt_role_disabled");
-            else if (Interop.Harmony.BizManTabPatch.Patched)
+                AddDefaults(o);
+                return;
+            }
+
+            // When the HQ BizMan tab is live it's the primary UI — this panel stays slim
+            // (pointer + global defaults + the quick actions above). The full manager/store
+            // controls below are the fallback for when the tab patch didn't apply.
+            if (Interop.Harmony.BizManTabPatch.Patched)
+            {
                 o.AddHeader("storemanager_opt_hqtab_hint");
+                AddDefaults(o);
+                return;
+            }
 
             var dir = Core.StoreManagerCityMod.Active;
             if (dir == null) { o.AddHeader("storemanager_opt_no_city"); AddDefaults(o); return; }

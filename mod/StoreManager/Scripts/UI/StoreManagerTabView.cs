@@ -51,8 +51,7 @@ namespace StoreManager.UI
                 _content = UiKit.Column(transform);
             UiKit.Clear(_content);
 
-            UiKit.Label(_content, "storemanager_bizmantab_title".L("Store Managers"), 24f, UiKit.TextColor, FontStyles.Bold);
-            UiKit.Spacer(_content, 4f);
+            UiKit.Label(_content, "storemanager_bizmantab_title".L("Store Managers"), 26f, UiKit.HeaderColor, FontStyles.Bold);
 
             if (!RoleSystemState.IsActive)
             {
@@ -77,24 +76,26 @@ namespace StoreManager.UI
             var cands = GameApi.GetManagerCandidates(hq.Address);
 
             // ── hire ──────────────────────────────────────────────────────────
-            UiKit.Button(_content, "storemanager_act_recruit".L("Hire a new Store Manager onto my HQ"), () =>
+            UiKit.Spacer(_content, 4f);
+            var hire = UiKit.Row(_content.transform, false, 12f, 40f);
+            var hb = UiKit.Button(hire.transform, "storemanager_act_recruit".L("Hire a new Store Manager onto my HQ"), () =>
             {
                 var r = RoleEmployees.Recruit(hq.Address);
                 Feedback.Toast(r.Ok ? Feedback.Level.Success : Feedback.Level.Warning,
                     r.Ok ? "storemanager_notify_ok" : "storemanager_notify_blocked", D(r.Message));
                 Rebuild();
-            }, 38f, UiKit.AccentColor);
+            }, 40f, UiKit.AccentColor);
+            UiKit.Flexible(hb.gameObject);
 
             UiKit.Label(_content, GameApi.RequireHqShift
-                ? "storemanager_bizmantab_shifthint".L("New hires need a desk shift here (HQ → Schedule) before you can pick them.")
+                ? "storemanager_bizmantab_shifthint".L("New hires need a desk shift here (BizMan → HQ → Schedule) before you can pick them.")
                 : "storemanager_bizmantab_assignhint".L("New hires need to be assigned to this HQ before you can pick them."),
-                13f, UiKit.MutedColor);
-            UiKit.Spacer(_content);
+                12f, UiKit.MutedColor);
 
             // ── manager ───────────────────────────────────────────────────────
             if (plan == null)
             {
-                UiKit.Label(_content, "storemanager_bizmantab_pickmgr".L("Eligible managers"), 17f, UiKit.TextColor, FontStyles.Bold);
+                UiKit.SectionHeader(_content, "storemanager_bizmantab_pickmgr".L("Eligible managers"));
                 if (cands.Count == 0)
                 {
                     UiKit.Label(_content, "storemanager_opt_no_candidates".L("No eligible Store Manager yet."), 14f, UiKit.MutedColor);
@@ -102,25 +103,28 @@ namespace StoreManager.UI
                 }
                 foreach (var c in cands)
                 {
-                    var row = UiKit.Row(_content.transform);
+                    var row = UiKit.Row(_content.transform, card: true);
                     var nm = UiKit.Label(row.transform, c.ToString(), 15f);
                     UiKit.Flexible(nm.gameObject);
                     var cid = c.Id;
-                    var btn = UiKit.Button(row.transform, "storemanager_bizmantab_make".L("Make Filiaalmanager"), () =>
+                    var btn = UiKit.Button(row.transform, "storemanager_bizmantab_make".L("Make Store Manager"), () =>
                     {
                         Announce(dir.AdoptManager(hq.Address, cid));
                         Rebuild();
-                    }, 30f);
-                    UiKit.FixedWidth(btn.gameObject, 240f);
+                    }, 30f, UiKit.AccentColor);
+                    UiKit.FixedWidth(btn.gameObject, 230f);
                 }
                 return;
             }
 
             var mgr = GameApi.FindManager(plan.ManagerEmployeeId);
-            var mgrRow = UiKit.Row(_content.transform, 8f, 34f);
+            int cap = GameApi.MaxStores(plan.HqAddress, plan.ManagerEmployeeId);
+            UiKit.SectionHeader(_content, "storemanager_opt_stores_header".L("Manager & supervised stores"));
+
+            var mgrRow = UiKit.Row(_content.transform, card: true, height: 44f);
             var ml = UiKit.Label(mgrRow.transform,
-                (mgr?.Name ?? "manager") + (plan.Dormant ? "  —  " + "storemanager_bizmantab_dormant".L("idle (not scheduled)") : ""),
-                16f, plan.Dormant ? UiKit.MutedColor : UiKit.TextColor, FontStyles.Bold);
+                (mgr?.Name ?? "manager") + (plan.Dormant ? "   ·   " + "storemanager_bizmantab_dormant".L("idle (not scheduled)") : ""),
+                16f, plan.Dormant ? UiKit.MutedColor : UiKit.HeaderColor, FontStyles.Bold);
             UiKit.Flexible(ml.gameObject);
             var drop = UiKit.Button(mgrRow.transform, "storemanager_bizmantab_drop".L("Remove"), () =>
             {
@@ -130,66 +134,57 @@ namespace StoreManager.UI
             }, 30f);
             UiKit.FixedWidth(drop.gameObject, 150f);
 
-            int cap = GameApi.MaxStores(plan.HqAddress, plan.ManagerEmployeeId);
             UiKit.Label(_content, string.Format("storemanager_bizmantab_cap".L("Supervising {0} of {1} stores (skill cap)"),
-                plan.Assignments.Count, cap), 13f, UiKit.MutedColor);
-            UiKit.Spacer(_content);
+                plan.Assignments.Count, cap), 12f, UiKit.MutedColor);
 
             // ── stores ────────────────────────────────────────────────────────
-            UiKit.Label(_content, "storemanager_opt_stores_header".L("Supervised stores"), 17f, UiKit.TextColor, FontStyles.Bold);
             foreach (var s in GameApi.GetSupervisableStores())
             {
                 string addr = s.Address;
                 bool supervised = plan.Supervises(addr);
                 var a = plan.Find(addr);
-
-                var row = UiKit.Row(_content.transform, 8f, 32f);
                 bool hasContract = DeliveryContracts.HasContract(addr);
+                bool atCap = !supervised && plan.Assignments.Count >= cap;
+
+                var row = UiKit.Row(_content.transform, card: supervised, height: 38f);
                 var lbl = UiKit.Label(row.transform,
-                    s.Name + (hasContract ? "" : "  " + "storemanager_bizmantab_nocontract".L("(no delivery contract)")),
-                    15f, supervised ? UiKit.TextColor : UiKit.MutedColor);
+                    s.Name + (hasContract ? "" : "   " + "storemanager_bizmantab_nocontract".L("(no delivery contract)")),
+                    15f, supervised ? UiKit.HeaderColor : UiKit.MutedColor);
                 UiKit.Flexible(lbl.gameObject);
 
-                bool atCap = !supervised && plan.Assignments.Count >= cap;
                 var tgl = UiKit.Button(row.transform,
                     supervised ? "storemanager_bizmantab_supervising".L("Supervising ✓")
-                               : atCap ? "storemanager_bizmantab_atcap".L("cap reached")
-                                       : "storemanager_bizmantab_assign".L("Assign"),
+                               : "storemanager_bizmantab_assign".L("Assign"),
                     () =>
                     {
                         if (supervised) Announce(dir.UnassignStore(plan.ManagerEmployeeId, addr));
                         else Announce(dir.AssignStore(plan.ManagerEmployeeId, addr));
                         Rebuild();
-                    }, 28f, supervised ? UiKit.AccentColor : UiKit.ButtonColor);
-                UiKit.FixedWidth(tgl.gameObject, 210f);
+                    }, 28f, supervised ? UiKit.AccentColor : null, enabled: supervised || !atCap);
+                UiKit.FixedWidth(tgl.gameObject, 200f);
 
                 if (supervised && a != null)
                 {
-                    var lim = UiKit.Row(_content.transform, 6f, 28f);
-                    UiKit.FixedWidth(UiKit.Label(lim.transform, "storemanager_opt_def_budget".L("Weekly budget"), 13f, UiKit.MutedColor).gameObject, 160f);
-                    MoneyStepper(lim.transform, a, dir, plan);
-                    UiKit.FixedWidth(UiKit.Label(lim.transform, "storemanager_opt_def_days".L("Target days"), 13f, UiKit.MutedColor).gameObject, 130f);
-                    DayStepper(lim.transform, a, dir, plan);
+                    var lim = UiKit.Row(_content.transform, false, 8f, 34f);
+                    UiKit.FixedWidth(UiKit.Label(lim.transform, "storemanager_bizmantab_budget".L("Weekly budget"), 12f, UiKit.MutedColor).gameObject, 150f);
+                    Stepper(lim.transform, $"${a.WeeklyRestockBudgetCap:N0}", 96f,
+                        () => { dir.SetCap(plan.ManagerEmployeeId, a.StoreAddress, a.WeeklyRestockBudgetCap - BudgetStep); Rebuild(); },
+                        () => { dir.SetCap(plan.ManagerEmployeeId, a.StoreAddress, a.WeeklyRestockBudgetCap + BudgetStep); Rebuild(); });
+                    UiKit.FixedWidth(UiKit.Label(lim.transform, "storemanager_bizmantab_days".L("Stock buffer (days)"), 12f, UiKit.MutedColor).gameObject, 170f);
+                    Stepper(lim.transform, a.TargetDaysOfStock.ToString(), 44f,
+                        () => { dir.SetTargetDays(plan.ManagerEmployeeId, a.StoreAddress, a.TargetDaysOfStock - 1); Rebuild(); },
+                        () => { dir.SetTargetDays(plan.ManagerEmployeeId, a.StoreAddress, a.TargetDaysOfStock + 1); Rebuild(); });
                 }
             }
         }
 
-        private void MoneyStepper(Transform parent, Domain.StoreAssignment a, ManagerDirectory dir, Domain.StoreManagerPlan plan)
+        private void Stepper(Transform parent, string value, float valueWidth, Action minus, Action plus)
         {
-            var minus = UiKit.Button(parent, "−", () => { dir.SetCap(plan.ManagerEmployeeId, a.StoreAddress, a.WeeklyRestockBudgetCap - BudgetStep); Rebuild(); }, 26f);
-            UiKit.FixedWidth(minus.gameObject, 34f);
-            UiKit.FixedWidth(UiKit.Label(parent, $"${a.WeeklyRestockBudgetCap:N0}", 14f).gameObject, 84f);
-            var plus = UiKit.Button(parent, "+", () => { dir.SetCap(plan.ManagerEmployeeId, a.StoreAddress, a.WeeklyRestockBudgetCap + BudgetStep); Rebuild(); }, 26f);
-            UiKit.FixedWidth(plus.gameObject, 34f);
-        }
-
-        private void DayStepper(Transform parent, Domain.StoreAssignment a, ManagerDirectory dir, Domain.StoreManagerPlan plan)
-        {
-            var minus = UiKit.Button(parent, "−", () => { dir.SetTargetDays(plan.ManagerEmployeeId, a.StoreAddress, a.TargetDaysOfStock - 1); Rebuild(); }, 26f);
-            UiKit.FixedWidth(minus.gameObject, 34f);
-            UiKit.FixedWidth(UiKit.Label(parent, a.TargetDaysOfStock.ToString(), 14f).gameObject, 40f);
-            var plus = UiKit.Button(parent, "+", () => { dir.SetTargetDays(plan.ManagerEmployeeId, a.StoreAddress, a.TargetDaysOfStock + 1); Rebuild(); }, 26f);
-            UiKit.FixedWidth(plus.gameObject, 34f);
+            UiKit.FixedWidth(UiKit.Button(parent, "−", minus, 28f).gameObject, 36f);
+            var v = UiKit.Label(parent, value, 14f);
+            v.alignment = TextAlignmentOptions.Center;
+            UiKit.FixedWidth(v.gameObject, valueWidth);
+            UiKit.FixedWidth(UiKit.Button(parent, "+", plus, 28f).gameObject, 36f);
         }
 
         private static void Announce(ActionResult r)
