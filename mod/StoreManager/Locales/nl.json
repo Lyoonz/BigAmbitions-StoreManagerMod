@@ -44,7 +44,7 @@
   "storemanager_notify_store_unassigned": "Filiaalmanager stopt met toezicht op {store}",
   "storemanager_notify_store_lost": "{store} is uit het plan van de manager (niet meer in bezit)",
   "storemanager_notify_manager_gone": "Je filiaalmanager is weg — zijn winkels zijn vrijgegeven",
-  "storemanager_notify_dormant": "Filiaalmanager is inactief — wijs 'm toe aan je kantoor om het plan te activeren",
+  "storemanager_notify_dormant": "Filiaalmanager is inactief — wijs 'm toe aan je kantoor én rooster 'm daar in op een bureau om het plan te activeren",
   "storemanager_notify_active": "Filiaalmanager is weer aan het werk",
   "storemanager_notify_restocked": "{store}: leveringsorder aangepast ({count} items, ~${cost}/wk)",
   "storemanager_notify_budget_cap": "{store}: weekbudget voorraad bereikt",

@@ -25,12 +25,12 @@ namespace StoreManager.Interop
         public const string HqBusinessType = "ba:businesstype_headquarters";
 
         /// <summary>
-        /// v1: <c>sm:skill_storemanager</c> is not yet in the HQ desks' <c>suitableSkills</c>
-        /// (deferred), so the game won't let the player put a Store Manager on an HQ desk shift.
-        /// Until that injection ships, the plan is active whenever the manager is simply *assigned*
-        /// to the HQ. Flip to true once desks accept the skill.
+        /// Whether the plan requires the manager to hold an actual HQ desk shift (vanilla-manager
+        /// behaviour). True once <see cref="HqDeskAccess"/> has the desks accepting the skill; until
+        /// then (or if that append fails) the plan is active whenever the manager is simply
+        /// *assigned* to the HQ, so the role still works.
         /// </summary>
-        public static readonly bool RequireHqShift = false;
+        public static bool RequireHqShift => HqDeskAccess.AllDesksReady();
         private const string EmptyBusinessType = "ba:businesstype_empty";
 
         public readonly struct Ref

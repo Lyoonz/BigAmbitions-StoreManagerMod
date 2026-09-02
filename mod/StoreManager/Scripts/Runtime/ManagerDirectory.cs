@@ -107,7 +107,9 @@ namespace StoreManager.Runtime
             if (GameApi.IsBoundToVanillaPlan(employeeId))
                 return ActionResult.No("that employee already runs an HR / Logistics / Pricing / Purchasing plan at the office");
             if (!skipScheduleCheck && GameApi.IsManagerOnDuty(employeeId, hqAddress) != true)
-                return ActionResult.No("assign the manager to the HQ first (My Employees → the manager → assign to your Headquarters)");
+                return ActionResult.No(GameApi.RequireHqShift
+                    ? "give the manager an HQ desk shift first (BizMan → HQ → Schedule — the desk now accepts the Filiaalmanager skill)"
+                    : "assign the manager to the HQ first (My Employees → the manager → assign to your Headquarters)");
 
             var m = GameApi.FindManager(employeeId);
             var plan = new StoreManagerPlan { ManagerEmployeeId = employeeId, HqAddress = hqAddress };

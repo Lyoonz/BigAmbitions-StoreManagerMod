@@ -234,6 +234,11 @@ namespace StoreManagerProbe
             try { L("V3 wage(sm,20)=" + calcWage?.Invoke(null, new object[] { "sm:skill_storemanager", 20f })
                      + "  wage(sm,50)=" + calcWage?.Invoke(null, new object[] { "sm:skill_storemanager", 50f }) + "  (target ~30)"); }
             catch (Exception e) { L("V3 wage threw: " + e.Message); }
+
+            var desk = FindTypeFull("StoreManager.Interop.HqDeskAccess");
+            try { L("V3 HqDeskAccess.Applied=" + desk?.GetProperty("Applied")?.GetValue(null)
+                     + " AllDesksReady=" + desk?.GetMethod("AllDesksReady")?.Invoke(null, null)); }
+            catch (Exception e) { L("V3 desk read threw: " + e.Message); }
             L("---- end V3 checks ----");
         }
 

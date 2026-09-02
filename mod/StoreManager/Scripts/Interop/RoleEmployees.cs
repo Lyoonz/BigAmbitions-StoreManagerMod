@@ -91,7 +91,7 @@ namespace StoreManager.Interop
             float wage = SafeWage();
             return new HireResult(true,
                 $"{cand.characterData?.name ?? "A Store Manager"} hired at the HQ (~${wage:N0}/h). " +
-                "Assign them to the HQ in My Employees, then pick them in the panel.",
+                "Give them a desk shift at the HQ (BizMan → HQ → Schedule), then pick them in the panel.",
                 cand.id);
         }
 

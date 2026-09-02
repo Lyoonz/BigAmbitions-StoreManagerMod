@@ -44,7 +44,7 @@
   "storemanager_notify_store_unassigned": "Store Manager stopped supervising {store}",
   "storemanager_notify_store_lost": "{store} left the manager's plan (no longer owned)",
   "storemanager_notify_manager_gone": "Your Store Manager is gone — their stores were released",
-  "storemanager_notify_dormant": "Store Manager is idle — assign them to your HQ to activate their plan",
+  "storemanager_notify_dormant": "Store Manager is idle — assign them to your HQ and give them a desk shift there to activate their plan",
   "storemanager_notify_active": "Store Manager is back on the job",
   "storemanager_notify_restocked": "{store}: delivery order adjusted ({count} items, ~${cost}/wk)",
   "storemanager_notify_budget_cap": "{store}: hit the weekly restock budget cap",

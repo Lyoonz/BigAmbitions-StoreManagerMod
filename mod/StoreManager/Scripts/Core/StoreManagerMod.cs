@@ -77,6 +77,7 @@ namespace StoreManager.Core
             try
             {
                 SkillRegistry.EnsureInjected();      // backstop — the Harmony prefix is primary
+                HqDeskAccess.EnsureDesksAcceptManager();   // backstop — the ItemsGetter postfix is primary
                 RoleSystemState.Evaluate();
 
                 _dir = new ManagerDirectory(StoreManagerInitMod.Defaults);
