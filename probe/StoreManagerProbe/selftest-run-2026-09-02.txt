@@ -1,0 +1,81 @@
+[SMPROBE] AutoLoad: chosen save day=125
+[SMPROBE] AutoLoad: completed = True
+[SMPROBE] day=125 dow=Saturday regs=885
+[SMPROBE] modData: 0 entries: []
+[SMPROBE] deliveryContracts: 4
+[SMPROBE]   CONTRACT biz=ba:street_fourthavenue 18 wholesale=ba:street_firststreet 37 enabled=False repeating=False nextDay=127 items=12 totalAmount=24000
+[SMPROBE]   CONTRACT biz=ba:street_tenthavenue 42 wholesale=ba:street_firststreet 37 enabled=False repeating=False nextDay=120 items=10 totalAmount=2000
+[SMPROBE]   CONTRACT biz=ba:street_fourthavenue 34 wholesale=ba:street_firststreet 37 enabled=False repeating=False nextDay=106 items=11 totalAmount=7000
+[SMPROBE]   CONTRACT biz=ba:street_seventhstreet 7 wholesale=ba:street_firststreet 37 enabled=False repeating=False nextDay=127 items=8 totalAmount=4000
+[SMPROBE] OWNED 'Benchmark Depot' type=ba:businesstype_warehouse emps=1 days=7
+[SMPROBE]   EMP Rebecca Lindauer id=XXR5VDyjTEiLxf9SsEZ1Vw== scheduled=True skills=[] purchasing=0
+[SMPROBE] OWNED 'The Signature Mart' type=ba:businesstype_supermarket emps=3 days=7
+[SMPROBE]   EMP Janet Sandoval id=JfRfZXyWhE2L3IjHk5+0Lw== scheduled=True skills=[] purchasing=0
+[SMPROBE]   EMP Lois Davidson id=cnRFNSOtyUO7Ej6YGipU1g== scheduled=True skills=[] purchasing=0
+[SMPROBE]   EMP Gladys Fuller id=96XWmSyZiEKglINYARluVQ== scheduled=True skills=[] purchasing=0
+[SMPROBE]   station ba:itemname_cleaningstation  suitableSkills=[ba:skill_cleaning]
+[SMPROBE]   station ba:itemname_checkoutcounterright  suitableSkills=[ba:skill_customerservice]
+[SMPROBE]   station ba:itemname_securityguardlocker  suitableSkills=[ba:skill_securityguard]
+[SMPROBE] OWNED HQ 'Foundation Headquarters' type=ba:businesstype_headquarters emps=4 days=7
+[SMPROBE]   EMP Richard Leary id=PCszvO7zIEOa86q6IqdmQ== scheduled=True skills=[] purchasing=100
+[SMPROBE]   EMP Phillip Wheeler id=rI1K9OmwT06ehXXoDgA79Q== scheduled=True skills=[] purchasing=0
+[SMPROBE]   EMP Jerome Starr id=QaGGcAiiyEGep0nj8PZNMA== scheduled=True skills=[] purchasing=0
+[SMPROBE]   EMP Melissa Tanner id=XkRwMbJD8UC2nnpuS6G80g== scheduled=True skills=[] purchasing=37
+[SMPROBE]   station ba:itemname_desktopcomputer  suitableSkills=[ba:skill_lawyer,ba:skill_purchasingagent,ba:skill_logisticsmanager,ba:skill_programmer,ba:skill_hrmanager,ba:skill_graphicdesigner,ba:skill_headhunter,ba:skill_travelagent,ba:skill_eventplanner,ba:skill_pricingmanager]
+[SMPROBE]   station ba:itemname_desktopcomputer  suitableSkills=[ba:skill_lawyer,ba:skill_purchasingagent,ba:skill_logisticsmanager,ba:skill_programmer,ba:skill_hrmanager,ba:skill_graphicdesigner,ba:skill_headhunter,ba:skill_travelagent,ba:skill_eventplanner,ba:skill_pricingmanager]
+[SMPROBE]   station ba:itemname_cleaningstation  suitableSkills=[ba:skill_cleaning]
+[SMPROBE]   station ba:itemname_laptop  suitableSkills=[ba:skill_lawyer,ba:skill_purchasingagent,ba:skill_logisticsmanager,ba:skill_programmer,ba:skill_hrmanager,ba:skill_graphicdesigner,ba:skill_headhunter,ba:skill_travelagent,ba:skill_eventplanner,ba:skill_pricingmanager]
+[SMPROBE]   station ba:itemname_computer  suitableSkills=[ba:skill_lawyer,ba:skill_purchasingagent,ba:skill_logisticsmanager,ba:skill_programmer,ba:skill_hrmanager,ba:skill_graphicdesigner,ba:skill_headhunter,ba:skill_travelagent,ba:skill_eventplanner,ba:skill_pricingmanager]
+[SMPROBE]   station ba:itemname_computer  suitableSkills=[ba:skill_lawyer,ba:skill_purchasingagent,ba:skill_logisticsmanager,ba:skill_programmer,ba:skill_hrmanager,ba:skill_graphicdesigner,ba:skill_headhunter,ba:skill_travelagent,ba:skill_eventplanner,ba:skill_pricingmanager]
+[SMPROBE] OWNED 'Axis Wear' type=ba:businesstype_clothingstore emps=0 days=7
+[SMPROBE]   station ba:itemname_cashregister  suitableSkills=[ba:skill_customerservice]
+[SMPROBE]   station ba:itemname_cleaningstation  suitableSkills=[ba:skill_cleaning]
+[SMPROBE]   station ba:itemname_cashregister  suitableSkills=[ba:skill_customerservice]
+[SMPROBE]   station ba:itemname_cleaningstation  suitableSkills=[ba:skill_cleaning]
+[SMPROBE]   station ba:itemname_cleaningstation  suitableSkills=[ba:skill_cleaning]
+[SMPROBE]   station ba:itemname_securityguardlocker  suitableSkills=[ba:skill_securityguard]
+[SMPROBE]   station ba:itemname_cleaningstation  suitableSkills=[ba:skill_cleaning]
+[SMPROBE]   station ba:itemname_cleaningstation  suitableSkills=[ba:skill_cleaning]
+[SMPROBE]   station ba:itemname_cashregister  suitableSkills=[ba:skill_customerservice]
+[SMPROBE]   station ba:itemname_cleaningstation  suitableSkills=[ba:skill_cleaning]
+[SMPROBE]   station ba:itemname_cashregister  suitableSkills=[ba:skill_customerservice]
+[SMPROBE]   station ba:itemname_cashregister  suitableSkills=[ba:skill_customerservice]
+[SMPROBE]   station ba:itemname_cleaningstation  suitableSkills=[ba:skill_cleaning]
+[SMPROBE]   station ba:itemname_securityguardlocker  suitableSkills=[ba:skill_securityguard]
+[SMPROBE]   station ba:itemname_cashregister  suitableSkills=[ba:skill_customerservice]
+[SMPROBE] OWNED 'The Hills Development' type=ba:businesstype_webdevelopmentagency emps=7 days=7
+[SMPROBE]   EMP Robert Caraballo id=3gcsiOZvBUWgWm9+YdhNvQ== scheduled=True skills=[] purchasing=0
+[SMPROBE]   EMP Raymond McCullough id=R3T4kf8x0m0VJpQd9U8EA== scheduled=True skills=[] purchasing=0
+[SMPROBE]   EMP Vicky Jones id=zYlQ5roTLE2tQ5KCKncljA== scheduled=True skills=[] purchasing=0
+[SMPROBE]   EMP Dennis Cook id=Z3C+1tpRWEqjk1Td6TtiSg== scheduled=True skills=[] purchasing=0
+[SMPROBE]   EMP Randy Noon id=oVr0hodjB0KBqrtzG2C1Q== scheduled=True skills=[] purchasing=0
+[SMPROBE]   EMP Julie Witt id=+waCXCPAqECajf7YeQuB5Q== scheduled=True skills=[] purchasing=0
+[SMPROBE]   EMP Jerry Marshall id=fiarK4GZOkWN7RSofeYXyQ== scheduled=True skills=[] purchasing=0
+[SMPROBE]   station ba:itemname_computer  suitableSkills=[ba:skill_lawyer,ba:skill_purchasingagent,ba:skill_logisticsmanager,ba:skill_programmer,ba:skill_hrmanager,ba:skill_graphicdesigner,ba:skill_headhunter,ba:skill_travelagent,ba:skill_eventplanner,ba:skill_pricingmanager]
+[SMPROBE]   station ba:itemname_computer  suitableSkills=[ba:skill_lawyer,ba:skill_purchasingagent,ba:skill_logisticsmanager,ba:skill_programmer,ba:skill_hrmanager,ba:skill_graphicdesigner,ba:skill_headhunter,ba:skill_travelagent,ba:skill_eventplanner,ba:skill_pricingmanager]
+[SMPROBE]   station ba:itemname_desktopcomputer  suitableSkills=[ba:skill_lawyer,ba:skill_purchasingagent,ba:skill_logisticsmanager,ba:skill_programmer,ba:skill_hrmanager,ba:skill_graphicdesigner,ba:skill_headhunter,ba:skill_travelagent,ba:skill_eventplanner,ba:skill_pricingmanager]
+[SMPROBE]   station ba:itemname_laptop  suitableSkills=[ba:skill_lawyer,ba:skill_purchasingagent,ba:skill_logisticsmanager,ba:skill_programmer,ba:skill_hrmanager,ba:skill_graphicdesigner,ba:skill_headhunter,ba:skill_travelagent,ba:skill_eventplanner,ba:skill_pricingmanager]
+[SMPROBE]   station ba:itemname_cleaningstation  suitableSkills=[ba:skill_cleaning]
+[SMPROBE] OWNED '' type=ba:businesstype_empty emps=0 days=7
+[SMPROBE] OWNED 'Mid District Diner' type=ba:businesstype_fastfoodrestaurant emps=2 days=7
+[SMPROBE]   EMP William Bauer id=1q30KFIwQUqH4zi+O2oykw== scheduled=True skills=[] purchasing=0
+[SMPROBE]   EMP Gwendolyn McManus id=Sor92p1IfkaNncxcDCpsVg== scheduled=True skills=[] purchasing=0
+[SMPROBE]   station ba:itemname_cashregister  suitableSkills=[ba:skill_customerservice]
+[SMPROBE]   station ba:itemname_cleaningstation  suitableSkills=[ba:skill_cleaning]
+[SMPROBE] OWNED 'Hell's Kitchen Eatery' type=ba:businesstype_fastfoodrestaurant emps=0 days=7
+[SMPROBE]   station ba:itemname_cashregister  suitableSkills=[ba:skill_customerservice]
+[SMPROBE]   station ba:itemname_cashregister  suitableSkills=[ba:skill_customerservice]
+[SMPROBE]   station ba:itemname_cleaningstation  suitableSkills=[ba:skill_cleaning]
+[SMPROBE] OWNED 'Industrial Diner' type=ba:businesstype_fastfoodrestaurant emps=2 days=7
+[SMPROBE]   EMP Jacqueline Walker id=VicIWtyLVEeK94wHTOmvvA== scheduled=True skills=[] purchasing=0
+[SMPROBE]   EMP Tony Sanchez id=7PDPzhuPBkelcCpup07psA== scheduled=True skills=[] purchasing=0
+[SMPROBE]   station ba:itemname_cleaningstation  suitableSkills=[ba:skill_cleaning]
+[SMPROBE]   station ba:itemname_cashregister  suitableSkills=[ba:skill_customerservice]
+[StoreManager] lines
+[StoreManager] lines
+[StoreManager] SelfTest: 7 supervisable store(s); 4 with a delivery contract
+[StoreManager] SelfTest: using existing agent Richard Leary (100 skill, scheduled)
+[StoreManager] SelfTest: store 'The Signature Mart' contract BEFORE  →  enabled=False repeating=False nextDay=127 items=8 totalAmount=4000 costPerDelivery=4,858 canModify=True
+[StoreManager] blocked: that employee already runs an HR / Logistics / Pricing / Purchasing plan at the office
+[StoreManager] SelfTest: adopt failed
+[StoreManager] SelfTest: done — DO NOT SAVE this session (a throwaway employee was briefly in memory).

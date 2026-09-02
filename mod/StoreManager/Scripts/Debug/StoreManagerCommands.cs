@@ -172,47 +172,46 @@ namespace StoreManager.Debugging
         public static void SelfTest()
         {
             if (_dir == null) { Log("SelfTest: no city loaded"); return; }
-            var hq = Hq();
-            if (string.IsNullOrEmpty(hq)) { Log("SelfTest: no HQ — rent an office first"); return; }
 
-            // 1. a manager
+            // 1. a store — prefer one that already has a delivery contract (the interesting path)
+            var stores = GameApi.GetSupervisableStores();
+            Log($"SelfTest: {stores.Count} supervisable store(s); " +
+                $"{stores.Count(s => DeliveryContracts.HasContract(s.Address))} with a delivery contract");
+            var store = stores.FirstOrDefault(s => DeliveryContracts.HasContract(s.Address));
+            if (string.IsNullOrEmpty(store.Address)) store = stores.FirstOrDefault();
+            if (string.IsNullOrEmpty(store.Address)) { Log("SelfTest: no supervisable store at all — bail"); return; }
+
+            // 2. a manager — an HQ if there is one, else pin the agent to the store itself
+            var hq = Hq();
+            string anchor = string.IsNullOrEmpty(hq) ? store.Address : hq;
             EmployeeInstance? throwaway = null;
-            var cands = GameApi.GetManagerCandidates(hq);
+            var cands = (string.IsNullOrEmpty(hq) ? new List<GameApi.EmpRef>() : GameApi.GetManagerCandidates(hq))
+                        .Where(c => !GameApi.IsBoundToVanillaPlan(c.Id)).ToList();   // skip agents already on a vanilla plan
             string mgrId;
-            if (cands.Count > 0) { mgrId = cands[0].Id; Log($"SelfTest: using existing agent {cands[0]}"); }
+            if (cands.Count > 0) { mgrId = cands[0].Id; Log($"SelfTest: using free agent {cands[0]}"); }
             else
             {
                 try
                 {
                     throwaway = EmployeeHelper.CreateAIEmployeeInstance(GameApi.ManagerSkill);
                     throwaway.characterData.name = "SELFTEST Agent";
-                    // set assignedAddress to the live HQ Address object (reflection avoids naming the game type + the buggy string parse)
-                    var addrObj = GameApi.HqAddressObject(hq);
+                    var addrObj = GameApi.HqAddressObject(anchor);   // live Address object of the anchor building
                     if (addrObj != null)
                         typeof(EmployeeInstance).GetField("assignedAddress")?.SetValue(throwaway, addrObj);
                     EmployeeHelper.GetEmployeeInstances().Add(throwaway);
                     EmployeeHelper.EmployeeInstancesDictionary[throwaway.id] = throwaway;
                     mgrId = throwaway.id;
-                    Log($"SelfTest: injected throwaway Purchasing Agent {mgrId}");
+                    Log($"SelfTest: injected throwaway Purchasing Agent {mgrId} anchored at {anchor} (hq={(string.IsNullOrEmpty(hq) ? "none" : hq)})");
                 }
                 catch (Exception e) { Log("SelfTest: could not create test agent: " + e.Message); return; }
             }
 
-            // 2. a store with a delivery contract
-            var store = GameApi.GetSupervisableStores()
-                .FirstOrDefault(s => DeliveryContracts.HasContract(s.Address));
-            if (string.IsNullOrEmpty(store.Address))
-            {
-                Log("SelfTest: no supervisable store has a delivery contract — set one up first, then re-run");
-                CleanupThrowaway(throwaway);
-                return;
-            }
-
+            _dir.SuppressSave = true;   // nothing this test does touches the real save's modData
             try
             {
                 Log($"SelfTest: store '{store.Name}' contract BEFORE  →  {DeliveryContracts.Describe(store.Address)}");
 
-                Report(_dir.AdoptManager(hq, mgrId, skipScheduleCheck: true));
+                Report(_dir.AdoptManager(anchor, mgrId, skipScheduleCheck: true));
                 var plan = _dir.PlanForManager(mgrId);
                 if (plan == null) { Log("SelfTest: adopt failed"); CleanupThrowaway(throwaway); return; }
                 plan.Dormant = false;
@@ -236,7 +235,8 @@ namespace StoreManager.Debugging
             finally
             {
                 CleanupThrowaway(throwaway);
-                Log("SelfTest: done — DO NOT SAVE this session (a throwaway employee/plan was in memory).");
+                _dir.SuppressSave = false;
+                Log("SelfTest: done — DO NOT SAVE this session (a throwaway employee was briefly in memory).");
             }
         }
 

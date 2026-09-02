@@ -34,6 +34,9 @@ namespace StoreManager.Runtime
         private bool _teardownArmed;     // first tick after load may run the destructive reconcile
         private int _lastHourReconcile = -99;
 
+        /// <summary>Set by the SelfTest harness so its in-memory throwaway plan is never persisted.</summary>
+        public bool SuppressSave;
+
         public ManagerDirectory(GlobalDefaults defaults) => _defaults = defaults;
 
         public IReadOnlyList<StoreManagerPlan> Plans => _plans;
@@ -64,7 +67,7 @@ namespace StoreManager.Runtime
 
         public void Save()
         {
-            if (_readOnly) return;
+            if (_readOnly || SuppressSave) return;
             try
             {
                 var json = Serialization.Serialize(_plans);

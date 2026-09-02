@@ -147,14 +147,33 @@ new Entities.TextMessage(string messageKey, Dictionary<string,string> data=null,
   e.g. `ba:itemname_cashregister` → `[ba:skill_customerservice]`, `ba:itemname_cleaningstation` → `[ba:skill_cleaning]`.
 - ✅ `GameApi` / `DeliveryContracts` read paths all work, zero exceptions.
 
-### Still to verify — needs a save WITH an HQ (the SelfTest bails without one)
-1. Does the HQ have an assignable desk workstation whose `suitableSkills` includes
-   `ba:skill_purchasingagent` (so the manager can be scheduled)? If not, the panel must say so.
-   — the v2 probe now dumps every owned building's stations + `suitableSkills`, so an HQ-save run answers this.
-2. Editing an **existing** contract's `enabled`/`items[].amount` on a Tue–Sat: survives to Monday's
-   delivery + bills the player + not overwritten by the game's own pass? (`StoreManager.SelfTest`
-   logs the contract before/after; run it, then advance to Monday to see the delivery.)
-3. `onSaveGame` fires synchronously before serialize (write `modData`, save, reload, check it's there).
+### Verified in-game 2026-09-02 — day-125 HQ save (`Foundation Headquarters`), `StoreManager.SelfTest`
+- ✅ **HQ desks accept the manager skill.** `ba:itemname_desktopcomputer` / `laptop` / `computer`
+  at the HQ list `ba:skill_purchasingagent` in `suitableSkills` — a Purchasing Agent can be
+  scheduled there. (Open question 1: **yes**.)
+- ✅ `GameApi.GetManagerCandidates(hq)` found the real skill-100 Purchasing Agent, flagged scheduled.
+- ✅ **Dual-binding guard fires:** that agent was already on a vanilla Purchasing Agent plan →
+  `AdoptManager` blocked with the right message. `PurchasingAgentHelper.GetAssignedPlanForPurchasingAgent`
+  works.
+- ✅ **Full loop, clean:** inject throwaway agent → adopt → assign `The Signature Mart` (supermarket,
+  8-item contract) → weekly pass:
+  - BEFORE `enabled=False repeating=False total=4000 cost=$4,155`
+  - AFTER  `enabled=True repeating=True total=7830 cost=$7,681` — enabled, set repeating, tuned all
+    8 lines once (not runaway), within the $100k test cap, `capsHit=0`, `attention=[]`.
+  - `week tally spend=$7,681` — matches the standing `TotalPricePerDelivery` (budget accounting fix works).
+- ✅ **Restore is exact:** after `DropManager`, contract back to `enabled=False repeating=False
+  total=4000` — byte-identical to BEFORE. Snapshot + restore correct.
+- ✅ Zero exceptions. `modData` stayed at 0 entries (`SuppressSave` — the throwaway plan never persisted).
+- ✅ **No save file touched** — every `.hsg` byte-identical before/after (only an unrelated game
+  auto-recover `.jpg` thumbnail appeared).
+
+### Still to verify (not blocking — needs a real multi-week playthrough)
+- The convergent `ComputeTarget` math over several in-game weeks: does the buffer settle where
+  expected, and does `amountOrderedLastWeek` behave as the demand proxy once deliveries run?
+- `GameInstance.modData` round-trip of a multi-KB plan blob through both save paths (CosaNostra
+  proves the mechanism for a small value; a real adopt + save + reload confirms it for ours).
+- The manager scheduled through the **vanilla** BizMan → HQ → Schedule tab (SelfTest uses
+  `skipScheduleCheck`); confirm `IsAssignedToAnyWorkShift()` at the HQ gates the plan as intended.
 
 ---
 
