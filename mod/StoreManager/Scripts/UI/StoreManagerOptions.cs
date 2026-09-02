@@ -98,7 +98,12 @@ namespace StoreManager.UI
                 Rebuild();
             });
 
-            if (plan == null) { o.AddButton("storemanager_opt_status", () => Debugging.StoreManagerCommands.PrintStatus()); AddDefaults(o); return; }
+            if (plan == null)
+            {
+                o.AddButton("storemanager_opt_selftest", Debugging.StoreManagerCommands.SelfTestFromPanel);
+                AddDefaults(o);
+                return;
+            }
 
             // ── supervised-store toggles ───────────────────────────────────────
             int cap = GameApi.MaxStores(plan.HqAddress, plan.ManagerEmployeeId);
@@ -121,8 +126,11 @@ namespace StoreManager.UI
                 });
             }
 
-            o.AddButton("storemanager_opt_status", () => Debugging.StoreManagerCommands.PrintStatus());
-            o.AddButton("storemanager_opt_planweek", () => { dir.RunWeeklyPlanning(); });
+            o.AddButton("storemanager_opt_status", () =>
+                Feedback.Toast(Feedback.Level.Info, "storemanager_notify_ok",
+                    new Dictionary<string, string> { { "msg", Debugging.StoreManagerCommands.StatusSummary() } }));
+            o.AddButton("storemanager_opt_planweek", () => dir.RunWeeklyPlanning());
+            o.AddButton("storemanager_opt_selftest", Debugging.StoreManagerCommands.SelfTestFromPanel);
 
             // ── per-store config ──────────────────────────────────────────────
             if (plan.Assignments.Count > 0)

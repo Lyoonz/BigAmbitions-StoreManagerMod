@@ -143,8 +143,8 @@ namespace StoreManager.Debugging
 
         private static void Status()
         {
-            if (_dir == null) { Log("no city loaded"); return; }
-            if (_dir.Plans.Count == 0) { Log("no Store Manager adopted"); return; }
+            Log(StatusSummary());
+            if (_dir == null) return;
             foreach (var p in _dir.Plans)
             {
                 var m = GameApi.FindManager(p.ManagerEmployeeId);
@@ -157,6 +157,21 @@ namespace StoreManager.Debugging
             }
         }
 
+        /// <summary>One-line status for the panel toast.</summary>
+        public static string StatusSummary()
+        {
+            if (_dir == null) return "no city loaded";
+            if (_dir.ReadOnly) return "read-only mode this session (saved data unreadable)";
+            if (_dir.Plans.Count == 0) return "no Store Manager adopted yet";
+            var p = _dir.Plans[0];
+            var m = GameApi.FindManager(p.ManagerEmployeeId);
+            int missing = p.Assignments.Count(a => !DeliveryContracts.HasContract(a.StoreAddress));
+            return $"{m?.Name ?? "manager"}: {p.Assignments.Count} store(s)" +
+                   (p.Dormant ? " — DORMANT (schedule them at the HQ)" : "") +
+                   $", ${p.Week.RestockSpend:N0}/wk" +
+                   (missing > 0 ? $", {missing} store(s) have no delivery contract" : "");
+        }
+
         private static void PlanWeek()
         {
             if (_dir == null) return;
@@ -164,29 +179,43 @@ namespace StoreManager.Debugging
             Log("weekly restock pass ran — see toasts + the phone thread");
         }
 
+        /// <summary>Console entry — logs the full trace.</summary>
+        public static void SelfTest() => Log(SelfTestCore());
+
+        /// <summary>
+        /// Panel entry — runs the same check and surfaces a one-line result as a toast + phone
+        /// message so it's visible without the console.
+        /// </summary>
+        public static void SelfTestFromPanel()
+        {
+            var summary = SelfTestCore();
+            bool ok = summary.StartsWith("PASS");
+            Interop.Feedback.Toast(ok ? Interop.Feedback.Level.Success : Interop.Feedback.Level.Warning,
+                "storemanager_notify_ok", new Dictionary<string, string> { { "msg", summary } });
+            Interop.Feedback.Message("storemanager_selftest_msg", new Dictionary<string, string> { { "result", summary } });
+        }
+
         /// <summary>
         /// Headless end-to-end check of the v2 loop against the live save. In-memory only —
-        /// injects a throwaway Purchasing Agent if needed, exercises adopt → assign → weekly
-        /// plan → drop (restore), logs contract state before/after, then cleans up.
+        /// injects a throwaway Purchasing Agent, exercises adopt → assign → weekly plan → drop
+        /// (restore), then cleans up. Returns a one-line PASS/FAIL summary; logs the full trace.
         /// </summary>
-        public static void SelfTest()
+        public static string SelfTestCore()
         {
-            if (_dir == null) { Log("SelfTest: no city loaded"); return; }
+            if (_dir == null) { Log("SelfTest: no city loaded"); return "FAIL: no city loaded"; }
 
-            // 1. a store — prefer one that already has a delivery contract (the interesting path)
             var stores = GameApi.GetSupervisableStores();
-            Log($"SelfTest: {stores.Count} supervisable store(s); " +
-                $"{stores.Count(s => DeliveryContracts.HasContract(s.Address))} with a delivery contract");
+            int withContract = stores.Count(s => DeliveryContracts.HasContract(s.Address));
+            Log($"SelfTest: {stores.Count} supervisable store(s); {withContract} with a delivery contract");
             var store = stores.FirstOrDefault(s => DeliveryContracts.HasContract(s.Address));
             if (string.IsNullOrEmpty(store.Address)) store = stores.FirstOrDefault();
-            if (string.IsNullOrEmpty(store.Address)) { Log("SelfTest: no supervisable store at all — bail"); return; }
+            if (string.IsNullOrEmpty(store.Address)) { Log("SelfTest: no supervisable store"); return "FAIL: you own no supervisable store"; }
 
-            // 2. a manager — an HQ if there is one, else pin the agent to the store itself
             var hq = Hq();
             string anchor = string.IsNullOrEmpty(hq) ? store.Address : hq;
             EmployeeInstance? throwaway = null;
             var cands = (string.IsNullOrEmpty(hq) ? new List<GameApi.EmpRef>() : GameApi.GetManagerCandidates(hq))
-                        .Where(c => !GameApi.IsBoundToVanillaPlan(c.Id)).ToList();   // skip agents already on a vanilla plan
+                        .Where(c => !GameApi.IsBoundToVanillaPlan(c.Id)).ToList();
             string mgrId;
             if (cands.Count > 0) { mgrId = cands[0].Id; Log($"SelfTest: using free agent {cands[0]}"); }
             else
@@ -195,49 +224,58 @@ namespace StoreManager.Debugging
                 {
                     throwaway = EmployeeHelper.CreateAIEmployeeInstance(GameApi.ManagerSkill);
                     throwaway.characterData.name = "SELFTEST Agent";
-                    var addrObj = GameApi.HqAddressObject(anchor);   // live Address object of the anchor building
+                    var addrObj = GameApi.HqAddressObject(anchor);
                     if (addrObj != null)
                         typeof(EmployeeInstance).GetField("assignedAddress")?.SetValue(throwaway, addrObj);
                     EmployeeHelper.GetEmployeeInstances().Add(throwaway);
                     EmployeeHelper.EmployeeInstancesDictionary[throwaway.id] = throwaway;
                     mgrId = throwaway.id;
-                    Log($"SelfTest: injected throwaway Purchasing Agent {mgrId} anchored at {anchor} (hq={(string.IsNullOrEmpty(hq) ? "none" : hq)})");
+                    Log($"SelfTest: injected throwaway agent {mgrId} at {anchor}");
                 }
-                catch (Exception e) { Log("SelfTest: could not create test agent: " + e.Message); return; }
+                catch (Exception e) { Log("SelfTest: could not create test agent: " + e.Message); return "FAIL: couldn't create a test agent (" + e.Message + ")"; }
             }
 
-            _dir.SuppressSave = true;   // nothing this test does touches the real save's modData
+            _dir.SuppressSave = true;
+            string result;
             try
             {
-                Log($"SelfTest: store '{store.Name}' contract BEFORE  →  {DeliveryContracts.Describe(store.Address)}");
+                string before = DeliveryContracts.Describe(store.Address);
+                Log($"SelfTest: '{store.Name}' BEFORE  →  {before}");
 
                 Report(_dir.AdoptManager(anchor, mgrId, skipScheduleCheck: true));
                 var plan = _dir.PlanForManager(mgrId);
-                if (plan == null) { Log("SelfTest: adopt failed"); CleanupThrowaway(throwaway); return; }
+                if (plan == null) { CleanupThrowaway(throwaway); _dir.SuppressSave = false; return "FAIL: adopt was blocked"; }
                 plan.Dormant = false;
 
                 Report(_dir.AssignStore(mgrId, store.Address));
-                Report(_dir.SetCap(mgrId, store.Address, 100000m));   // generous cap so we see full order
+                Report(_dir.SetCap(mgrId, store.Address, 100000m));
                 Report(_dir.SetTargetDays(mgrId, store.Address, 14));
 
                 _dir.RunWeeklyPlanning();
 
-                Log($"SelfTest: store '{store.Name}' contract AFTER   →  {DeliveryContracts.Describe(store.Address)}");
-                var a = plan.Find(store.Address);
-                Log($"SelfTest: week tally  spend=${plan.Week.RestockSpend:N0} orders={plan.Week.OrdersPlaced} " +
-                    $"covered={plan.Week.StoresCovered} capsHit={plan.Week.BudgetCapsHit} " +
-                    $"attention=[{string.Join(" | ", plan.Week.AttentionItems)}]");
+                string after = DeliveryContracts.Describe(store.Address);
+                var w = plan.Week;
+                Log($"SelfTest: '{store.Name}' AFTER   →  {after}");
+                Log($"SelfTest: tally spend=${w.RestockSpend:N0} orders={w.OrdersPlaced} covered={w.StoresCovered} " +
+                    $"caps={w.BudgetCapsHit} attention=[{string.Join(" | ", w.AttentionItems)}]");
 
                 _dir.DropManager(mgrId);
-                Log($"SelfTest: store '{store.Name}' contract RESTORED → {DeliveryContracts.Describe(store.Address)}");
+                string restored = DeliveryContracts.Describe(store.Address);
+                Log($"SelfTest: '{store.Name}' RESTORED → {restored}");
+
+                bool restoredOk = restored == before;
+                result = restoredOk && w.StoresCovered == 1
+                    ? $"PASS: {store.Name} restocked (${w.RestockSpend:N0}/wk, {w.OrdersPlaced} lines), contract restored exactly."
+                    : $"CHECK: covered={w.StoresCovered}, restoredExact={restoredOk}. See Player.log for detail.";
             }
-            catch (Exception e) { Log("SelfTest threw: " + e); }
+            catch (Exception e) { Log("SelfTest threw: " + e); result = "FAIL: exception — " + e.Message; }
             finally
             {
                 CleanupThrowaway(throwaway);
                 _dir.SuppressSave = false;
-                Log("SelfTest: done — DO NOT SAVE this session (a throwaway employee was briefly in memory).");
+                Log("SelfTest: done — don't save the game right after (a throwaway employee was briefly in memory).");
             }
+            return result;
         }
 
         private static void CleanupThrowaway(EmployeeInstance? e)
