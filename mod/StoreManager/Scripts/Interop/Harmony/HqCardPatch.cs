@@ -29,25 +29,6 @@ namespace StoreManager.Interop.Harmony
         public static string? Disabled { get; private set; }
 
         private static Type? _t;
-        private static bool _dumped;
-
-        private static void DumpRt(string tag, Transform root, System.Text.StringBuilder sb)
-        {
-            void Walk(Transform t, int d)
-            {
-                var rt = t as RectTransform;
-                var tmp = t.GetComponent<TMPro.TextMeshProUGUI>();
-                sb.Append(tag).Append(' ').Append(new string(' ', d * 2)).Append(t.name)
-                  .Append("  anchoredPos=").Append(rt != null ? rt.anchoredPosition.ToString("F0") : "-")
-                  .Append(" size=").Append(rt != null ? rt.sizeDelta.ToString("F0") : "-")
-                  .Append(" anchors=").Append(rt != null ? $"{rt.anchorMin.x:F2},{rt.anchorMin.y:F2}-{rt.anchorMax.x:F2},{rt.anchorMax.y:F2}" : "-")
-                  .Append(" pivot=").Append(rt != null ? rt.pivot.ToString("F2") : "-");
-                if (tmp != null) sb.Append(" TMP=\"").Append(tmp.text).Append("\" align=").Append(tmp.alignment);
-                sb.AppendLine();
-                for (int i = 0; i < t.childCount; i++) Walk(t.GetChild(i), d + 1);
-            }
-            Walk(root, 0);
-        }
 
         public static bool Resolve()
         {
@@ -112,21 +93,17 @@ namespace StoreManager.Interop.Harmony
                 }
                 catch { }
 
-                // "Count" is a direct child (same as the vanilla SetUpEmployeeCounter path)
+                // exactly what vanilla SetUpEmployeeCounter does: set the "Count" label text
                 var countT = clone.transform.Find("Count");
                 var countLbl = countT != null ? countT.GetComponent<TextMeshProUGUI>() : null;
                 if (countLbl != null) countLbl.text = count.ToString();
 
-                // role-name label: set the TMP text DIRECTLY and neutralise the loc component so it
-                // never re-resolves the copied key and shifts the layout.
-                foreach (var t in clone.GetComponentsInChildren<TextMeshProUGUI>(true))
-                {
-                    if (t == countLbl || (countT != null && t.transform.IsChildOf(countT))) continue;
-                    var lc = t.GetComponent<Localizor.LanguageChangeEvent.TextLocalizationComponent>();
-                    if (lc != null) lc.enabled = false;
-                    t.text = Loc.T("storemanager_hqcard_label", "Filiaalmanager");
-                    break;
-                }
+                // role-name label: just repoint the copied localisation key — the component does
+                // its own layout work on enable, same as every vanilla row.
+                var nameT = clone.transform.Find("Label");
+                var lc = nameT != null ? nameT.GetComponent<Localizor.LanguageChangeEvent.TextLocalizationComponent>() : null;
+                if (lc != null) { try { lc.Key = "storemanager_hqcard_label"; } catch { } }
+                else if (nameT?.GetComponent<TextMeshProUGUI>() is { } nt) nt.text = Loc.T("storemanager_hqcard_label", "Store Manager");
 
                 var btn = clone.GetComponent<Button>();
                 if (btn != null)
@@ -136,14 +113,8 @@ namespace StoreManager.Interop.Harmony
                     btn.onClick.AddListener(() => BizManTabPatch.OpenHqTab(addr));
                 }
 
-                if (!_dumped)
-                {
-                    _dumped = true;
-                    var sb = new System.Text.StringBuilder("\n[StoreManager] HQ counter geometry:\n");
-                    DumpRt("ANCHOR", anchor, sb);
-                    DumpRt("CLONE ", clone.transform, sb);
-                    Debug.Log(sb.ToString());
-                }
+                // copy the live child positions from the good sibling once the layout has settled
+                clone.AddComponent<HqCounterAlign>().Init(anchor);
             }
             catch (Exception e) { Debug.LogError("[StoreManager] HQ card postfix swallowed: " + e); }
         }
@@ -157,6 +128,39 @@ namespace StoreManager.Interop.Harmony
                 return f?.GetValue(list) as Transform;
             }
             catch { return null; }
+        }
+    }
+
+    /// <summary>
+    /// The cloned HQ counter renders shifted despite identical serialized geometry (the vanilla
+    /// layout does something to it we can't see). This copies the live rect of the "Count" and
+    /// "Label" children from a known-good sibling for a few frames after the card appears.
+    /// </summary>
+    public sealed class HqCounterAlign : MonoBehaviour
+    {
+        private RectTransform? _srcCount, _srcLabel;
+
+        public void Init(Transform good)
+        {
+            _srcCount = good.Find("Count") as RectTransform;
+            _srcLabel = good.Find("Label") as RectTransform;
+        }
+
+        private void OnEnable() => Apply();
+        private void LateUpdate() => Apply();
+
+        private void Apply()
+        {
+            Copy(_srcCount, transform.Find("Count") as RectTransform);
+            Copy(_srcLabel, transform.Find("Label") as RectTransform);
+        }
+
+        private static void Copy(RectTransform? src, RectTransform? dst)
+        {
+            if (src == null || dst == null) return;
+            dst.anchorMin = src.anchorMin; dst.anchorMax = src.anchorMax; dst.pivot = src.pivot;
+            dst.sizeDelta = src.sizeDelta; dst.anchoredPosition = src.anchoredPosition;
+            dst.localScale = src.localScale;
         }
     }
 }

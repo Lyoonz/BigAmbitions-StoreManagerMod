@@ -31,7 +31,7 @@
   "storemanager_opt_pick_manager": "— pick a manager —",
   "storemanager_opt_manager_label": "Store Manager",
   "storemanager_opt_stores_header": "Manager & supervised stores",
-  "storemanager_opt_defaults_header": "Defaults for newly assigned stores",
+  "storemanager_opt_defaults_header": "Store Manager — defaults for new stores",
   "storemanager_opt_def_budget": "Weekly restock budget",
   "storemanager_opt_def_days": "Keep stock for … days",
   "storemanager_opt_def_margin": "Order extra (margin)",

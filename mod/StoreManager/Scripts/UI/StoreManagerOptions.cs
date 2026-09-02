@@ -51,7 +51,7 @@ namespace StoreManager.UI
             RebuildCount++;
             try
             {
-                var o = new ModOptions().AddHeader("storemanager_options_header");
+                var o = new ModOptions();
                 try { BuildBody(o); }
                 catch (Exception e) { Debug.LogError("[StoreManager] options build failed: " + e); }
                 try { OptionsService.Register(_modId, o); }
@@ -79,10 +79,11 @@ namespace StoreManager.UI
             }
 
             bool tabLive = Interop.Harmony.BizManTabPatch.Patched;
-            o.AddHeader(tabLive ? "storemanager_opt_hqtab_hint" : "storemanager_opt_notab_hint");
-
             if (!tabLive)
+            {
+                o.AddHeader("storemanager_opt_notab_hint");
                 AddFallbackControls(o);
+            }
 
             AddDefaults(o);
             AddUninstall(o);
@@ -91,7 +92,7 @@ namespace StoreManager.UI
         // ── defaults for newly assigned stores ─────────────────────────────────
         private static void AddDefaults(ModOptions o)
         {
-            o.AddSplitter().AddHeader("storemanager_opt_defaults_header");
+            o.AddHeader("storemanager_opt_defaults_header");
             o.AddSlider(Id("sm_def_budget"), "storemanager_opt_def_budget", 0, 30000, (int)_defaults.WeeklyRestockBudgetCap,
                 v => { if (!_building) _defaults.WeeklyRestockBudgetCap = v; }, "storemanager_opt_money_suffix");
             o.AddSlider(Id("sm_def_days"), "storemanager_opt_def_days", 1, 30, _defaults.TargetDaysOfStock,
