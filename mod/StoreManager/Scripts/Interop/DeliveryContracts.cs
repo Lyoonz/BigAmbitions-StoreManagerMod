@@ -132,10 +132,12 @@ namespace StoreManager.Interop
                 // snapshot amounts so we can revert if the plan doesn't fit the budget
                 var before = items.ToDictionary(i => i, i => i.amount);
                 int daysTarget = Math.Min(60, Math.Max(1, a.TargetDaysOfStock));
+                double margin = 1.0 + Math.Max(0, Math.Min(200, a.SafetyMarginPercent)) / 100.0;
 
                 foreach (var it in items)
                 {
                     int target = ComputeTarget(it, storeReg, daysTarget);
+                    if (margin > 1.0) target = Math.Max(1, (int)Math.Ceiling(target * margin));
                     if (target != it.amount) { it.amount = target; r.OrdersAdjusted++; }
                 }
 

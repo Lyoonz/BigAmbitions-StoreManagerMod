@@ -188,6 +188,15 @@ namespace StoreManager.Runtime
             return ActionResult.Yes($"{a.StoreName}: target stock = {a.TargetDaysOfStock} days");
         }
 
+        public ActionResult SetSafetyMargin(string employeeId, string storeAddress, int percent)
+        {
+            var a = PlanForManager(employeeId)?.Find(storeAddress);
+            if (a == null) return ActionResult.No("not supervising that store");
+            a.SafetyMarginPercent = Math.Min(200, Math.Max(0, percent));
+            Save();
+            return ActionResult.Yes($"{a.StoreName}: safety margin = {a.SafetyMarginPercent}%");
+        }
+
         // ── ticks (all called from the game's unguarded event invoke) ───────────
         public void OnNewDay()
         {

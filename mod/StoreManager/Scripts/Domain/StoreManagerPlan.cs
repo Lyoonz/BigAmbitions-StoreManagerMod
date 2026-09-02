@@ -80,6 +80,12 @@ namespace StoreManager.Domain
         /// <summary>Target buffer: order enough that projected stock covers this many days of sales.</summary>
         public int TargetDaysOfStock = 10;
 
+        /// <summary>
+        /// Extra safety margin added on top of the manager's computed weekly order, as a percentage
+        /// (0 = none). Applied per line before the budget cap, so a tight budget still trims it back.
+        /// </summary>
+        public int SafetyMarginPercent = 0;
+
         public StaffingLevel Staffing = StaffingLevel.Normal;
 
         /// <summary>Spent restocking this store in the current delivery week (reset with the digest).</summary>
@@ -97,6 +103,7 @@ namespace StoreManager.Domain
             StoreName = name,
             WeeklyRestockBudgetCap = d.WeeklyRestockBudgetCap,
             TargetDaysOfStock = d.TargetDaysOfStock,
+            SafetyMarginPercent = d.SafetyMarginPercent,
             Staffing = d.Staffing,
         };
     }
@@ -132,6 +139,7 @@ namespace StoreManager.Domain
     {
         public decimal WeeklyRestockBudgetCap = 5000m;
         public int TargetDaysOfStock = 10;
+        public int SafetyMarginPercent = 0;
         public StaffingLevel Staffing = StaffingLevel.Normal;
 
         public static GlobalDefaults Default() => new();

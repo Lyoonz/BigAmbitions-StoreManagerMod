@@ -169,8 +169,15 @@ namespace StoreManager.UI
                         if (v != assignment.TargetDaysOfStock) { dir.SetTargetDays(mgrId, assignment.StoreAddress, (int)v); Rebuild(); }
                     });
 
+                    var lim2 = UiKit.Row(_content.transform, false, 10f, 36f);
+                    UiKit.FixedWidth(UiKit.Label(lim2.transform, "storemanager_bizmantab_margin".L("Order extra (%)"), 12f, UiKit.MutedColor).gameObject, 200f);
+                    UiKit.Stepper(lim2.transform, assignment.SafetyMarginPercent, 5, 0, 200, 70f, v =>
+                    {
+                        if (v != assignment.SafetyMarginPercent) { dir.SetSafetyMargin(mgrId, assignment.StoreAddress, (int)v); Rebuild(); }
+                    });
+
                     UiKit.Label(_content, "storemanager_bizmantab_dayshelp".L(
-                        "How many days of sales each shop keeps on the shelf. The manager orders toward that — within the weekly budget."),
+                        "\"Keep stock for N days\" is the target; \"Order extra %\" adds a safety margin on top of every order (still capped by the weekly budget)."),
                         11f, UiKit.MutedColor);
                 }
             }

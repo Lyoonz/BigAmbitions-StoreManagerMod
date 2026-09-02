@@ -80,6 +80,13 @@ namespace StoreManager.Interop.Harmony
                 clone.name = CounterId;
                 clone.transform.SetSiblingIndex(anchor.GetSiblingIndex() + 1);
 
+                // match the anchor's layout exactly (Instantiate copies it, but be explicit)
+                if (anchor is RectTransform art && (RectTransform)clone.transform is RectTransform crt)
+                {
+                    crt.anchorMin = art.anchorMin; crt.anchorMax = art.anchorMax; crt.pivot = art.pivot;
+                    crt.sizeDelta = art.sizeDelta; crt.anchoredPosition = art.anchoredPosition; crt.localScale = art.localScale;
+                }
+
                 // count sm:skill_storemanager employees assigned to this HQ
                 int count = 0;
                 try
@@ -93,16 +100,19 @@ namespace StoreManager.Interop.Harmony
                 }
                 catch { }
 
-                var countLbl = clone.transform.Find("Count")?.GetComponent<TextMeshProUGUI>()
-                            ?? clone.GetComponentsInChildren<TextMeshProUGUI>(true).FirstOrDefault(x => x.name == "Count");
+                // "Count" is a direct child (same as the vanilla SetUpEmployeeCounter path)
+                var countT = clone.transform.Find("Count");
+                var countLbl = countT != null ? countT.GetComponent<TextMeshProUGUI>() : null;
                 if (countLbl != null) countLbl.text = count.ToString();
 
-                // label / icon — set the visible caption if there's a localisation component
-                var loc = clone.GetComponentInChildren<Localizor.LanguageChangeEvent.TextLocalizationComponent>(true);
-                if (loc != null)
+                // the role-name label: the localisation component that is NOT on the Count object
+                foreach (var lc in clone.GetComponentsInChildren<Localizor.LanguageChangeEvent.TextLocalizationComponent>(true))
                 {
-                    try { loc.Key = "storemanager_bizmantab_menu"; } catch { }
-                    try { loc.SetValue(Loc.T("storemanager_bizmantab_menu", "Filiaalmanagers")); } catch { }
+                    if (countT != null && lc.transform.IsChildOf(countT)) continue;
+                    if (lc.transform == countT) continue;
+                    try { lc.Key = "storemanager_hqcard_label"; } catch { }
+                    try { lc.SetValue(Loc.T("storemanager_hqcard_label", "Filiaalmanager")); } catch { }
+                    break;
                 }
 
                 var btn = clone.GetComponent<Button>();
@@ -112,6 +122,12 @@ namespace StoreManager.Interop.Harmony
                     var addr = hq.Address;
                     btn.onClick.AddListener(() => BizManTabPatch.OpenHqTab(addr));
                 }
+
+                try
+                {
+                    UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(counterRow as RectTransform);
+                }
+                catch { }
             }
             catch (Exception e) { Debug.LogError("[StoreManager] HQ card postfix swallowed: " + e); }
         }

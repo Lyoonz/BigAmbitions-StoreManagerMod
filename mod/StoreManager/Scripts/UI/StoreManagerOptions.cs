@@ -80,11 +80,11 @@ namespace StoreManager.UI
 
             bool tabLive = Interop.Harmony.BizManTabPatch.Patched;
             o.AddHeader(tabLive ? "storemanager_opt_hqtab_hint" : "storemanager_opt_notab_hint");
-            AddDefaults(o);
 
             if (!tabLive)
                 AddFallbackControls(o);
 
+            AddDefaults(o);
             AddUninstall(o);
         }
 
@@ -96,7 +96,8 @@ namespace StoreManager.UI
                 v => { if (!_building) _defaults.WeeklyRestockBudgetCap = v; }, "storemanager_opt_money_suffix");
             o.AddSlider(Id("sm_def_days"), "storemanager_opt_def_days", 1, 30, _defaults.TargetDaysOfStock,
                 v => { if (!_building) _defaults.TargetDaysOfStock = v; }, "storemanager_opt_days_suffix");
-            o.AddHeader("storemanager_opt_def_days_help");
+            o.AddSlider(Id("sm_def_margin"), "storemanager_opt_def_margin", 0, 100, _defaults.SafetyMarginPercent,
+                v => { if (!_building) _defaults.SafetyMarginPercent = v; }, "storemanager_opt_pct_suffix");
         }
 
         // ── safe uninstall ─────────────────────────────────────────────────────
