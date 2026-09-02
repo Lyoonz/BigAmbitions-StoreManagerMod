@@ -4,8 +4,8 @@ This supersedes the v1 lightweight design. v1 (off-screen data role, console/but
 built and works but the user rejected the UX. v2 makes the manager a **real hired employee**
 managed through the game's own UI, with a mod supervision layer on top.
 
-Backing research: `docs/research/`. API names below are from the **in-game reflection dump**
-(`docs/research/reflection-dump-2026-09-01.txt`) — the decompile is partly obfuscated, the dump is not.
+API names below are from the **in-game reflection dump**
+from an in-game reflection dump — the decompile is partly obfuscated, the dump is not.
 
 ---
 

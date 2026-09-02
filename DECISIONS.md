@@ -3,8 +3,6 @@
 Decisions made while executing the plan of approach, with the evidence they rest on.
 Mirrored into the design-brief artifact.
 
-- Design brief: https://claude.ai/code/artifact/c3ae27f3-29b9-48a5-94e3-71116b82e955
-- Phase 0 runbook: https://claude.ai/code/artifact/f2682273-e63e-457c-be0a-daeb40e50ab4
 
 ## D1 — Toolchain: the official SDK, not BepInEx
 
@@ -97,7 +95,7 @@ scratch. StuartArmour flagged it as "a bit much" himself.
 ## D8 — Project lives as a standalone repo
 
 `C:\Source\BigAmbitions-StoreManagerMod\`, structured so `mod/StoreManager/` drops straight into
-`<SDK clone>/Assets/Mods/StoreManager/`. Not inside the HekWereldBlazor repo (unrelated).
+`<SDK clone>/Assets/Mods/StoreManager/`. In a separate standalone repo (unrelated to any other project).
 
 ## Wage ladder (placeholder numbers, for playtest tuning)
 
@@ -119,7 +117,7 @@ ladder above is vestigial.)*
 The user rejected v1's off-screen data role. They want: hire via the office like an HR Manager,
 appear in My Employees, schedule the manager, assign to N stores, set per-store limits,
 auto-restock via delivery — all with visible feedback. Backed by a research + design workflow
-and an in-game reflection dump. Full architecture: `docs/DESIGN-v2.md`. Raw research: `docs/research/`.
+and an in-game reflection dump. Full architecture: `docs/DESIGN-v2.md`. (design rationale is captured here and in `docs/DESIGN-v2.md`).
 
 ## D9 — Architecture: Option B (mod-owned supervision plan)
 
@@ -202,7 +200,7 @@ set their contracts `enabled=false`.
 
 The user wants **two new hired roles** (`Filiaalmanager` / Store Manager + `Team Leader`), each
 with its own job title, wage rung, and office hire flow — not a reused `ba:skill_purchasingagent`.
-Full research + two adversarial critiques in `docs/research/v3/`; plan in `docs/DESIGN-v3.md`.
+Plan in `docs/DESIGN-v3.md`.
 
 **Phase A (first native release) = Store Manager only.** One custom skill
 `sm:skill_storemanager`, built at runtime via `ScriptableObject.CreateInstance<SkillData>()`

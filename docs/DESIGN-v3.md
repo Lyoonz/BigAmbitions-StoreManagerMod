@@ -2,7 +2,7 @@
 
 Supersedes v2's "reuse `ba:skill_purchasingagent`" (D10). The user wants two genuinely new
 hired roles with their own job title, wage, and office hire flow. Full research +
-two adversarial critiques: `docs/research/v3/`.
+two adversarial critiques (internal, not in the repo).
 
 **D10 overridden. D9 / D12 / D13 / D14 stand.**
 

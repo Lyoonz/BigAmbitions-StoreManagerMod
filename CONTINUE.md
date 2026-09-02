@@ -77,7 +77,7 @@ StuartArmour, Lyoon). Not related to any other repo.
 
 The game **auto-updated Build 3670 → 3672** mid-build. The `dotnet build build/CompileCheck.csproj`
 check compiles against the live DLLs, so it's the source of truth; the decompile in
-`docs/research/reflection-dump-*.txt` is Build 3672 but the prose research files predate it —
+the in-game reflection dump is Build 3672 —
 re-verify any exact signature the compiler flags.
 
 ### v2 Phase 1 file map (all under `mod/StoreManager/Scripts/`)
@@ -100,8 +100,6 @@ were deleted (recoverable from git ≤ `e3c47b8`); Phase 3 re-introduces "manage
 
 ## Artifacts (claude.ai — accessible from any machine)
 
-- Design brief: https://claude.ai/code/artifact/c3ae27f3-29b9-48a5-94e3-71116b82e955
-- Phase 0 runbook: https://claude.ai/code/artifact/f2682273-e63e-457c-be0a-daeb40e50ab4
 
 They describe v1. Update them once v2 Phase 1 lands (or note they're historical).
 
@@ -133,7 +131,7 @@ DECISIONS.md  HANDOFF.md  PHASE0-FINDINGS.md  README.md
    `C:\Program Files (x86)\Steam\steamapps\common\Big Ambitions`
    Managed DLLs: `Big Ambitions_Data\Managed\`. Override the build path with
    `dotnet build build/PackMod.csproj -p:GameManaged="D:\...\Big Ambitions_Data\Managed"`.
-4. **Regenerate the decompile** (the `docs/research/*.txt` reflection dump is the API source of
+4. **Regenerate the decompile** (the in-game reflection dump is the API source of
    truth, but a browsable decompile helps):
    ```
    dotnet tool install -g ilspycmd
