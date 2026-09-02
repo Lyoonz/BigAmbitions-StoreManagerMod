@@ -113,16 +113,18 @@ namespace StoreManager.Interop
             foreach (var e in all)
             {
                 if (e == null) continue;
-                if (SkillValue(e) < 1f) continue;   // any real Purchasing Agent skill, trained or not
-                if (e.assignedAddress == null || e.assignedAddress.ToString() != hqAddress) continue;
+                if (e.assignedAddress == null || e.assignedAddress.ToString() != hqAddress) continue;   // cheap + silent
+                if (!Try(() => e.HasSkill(ManagerSkill))) continue;                                      // HasSkill is silent; GetSkillValue logs a warning per miss
                 result.Add(ToEmpRef(e));
             }
             return result;
         }
 
+        /// <summary>Skill level 0–100 — guarded so it never triggers the game's "Skill not found" log spam.</summary>
         private static float SkillValue(EmployeeInstance e)
         {
-            try { return e.GetSkillValue(ManagerSkill); } catch { return 0f; }
+            try { return e.HasSkill(ManagerSkill) ? e.GetSkillValue(ManagerSkill) : 0f; }
+            catch { return 0f; }
         }
 
         public static EmpRef? FindManager(string employeeId)
@@ -136,7 +138,7 @@ namespace StoreManager.Interop
         public static bool HasManagerSkill(string employeeId)
         {
             var e = FindEmployee(employeeId);
-            return e != null && SkillValue(e) >= 1f;
+            return e != null && Try(() => e.HasSkill(ManagerSkill));
         }
 
         public static string HqAddressOf(string employeeId)

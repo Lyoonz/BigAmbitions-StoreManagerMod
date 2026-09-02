@@ -192,7 +192,7 @@ namespace StoreManagerProbe
         }
 
         private static string SafeSkill(EmployeeInstance e, string k)
-        { try { return e.GetSkillValue(k).ToString("0"); } catch { return "?"; } }
+        { try { return e.HasSkill(k) ? e.GetSkillValue(k).ToString("0") : "-"; } catch { return "?"; } }
 
         private static string Addr(Address? a) { try { return a?.ToString() ?? "-"; } catch { return "-"; } }
 
