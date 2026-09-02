@@ -102,11 +102,16 @@ accept "Purchasing Agent" as the shown title.
   trims **flat pro-rata** to `WeeklyRestockBudgetCap`, writes the store's **one** `DeliveryContract`.
   A store with no departments = one implicit whole-store department on the proven v2 `ComputeTarget`.
   Managed as a **drill-down inside the Store Manager UI**, not a separate tab.
-- **HQ BizMan tab** — one Harmony Postfix on `BizManBusiness.SetUpTabs` (private void, global
-  namespace): clone the live `PurchasingAgents` menu button, insert the id into private `_tabs`
-  (`BizManBusiness.cs:166` kicks the user off a tab not in `_tabs`), `SetActive`. Runtime uGUI
-  content. Gated + degrade-to-panel. Both critiques: highest fragility, lowest value — do it
-  last, one tab only (Team Leader is a section inside it).
+- ~~**HQ BizMan tab**~~ **DONE 2026-09-02 (Phase B)** — user asked for it: manage from the HQ
+  screen like Purchasing Agents / HR. `Interop/Harmony/BizManTabPatch.cs` = one Postfix on
+  `BizManBusiness.SetUpTabs`: clones the live `PurchasingAgents` menu button, inserts
+  `"StoreManagers"` into private `_tabs` after `PurchasingAgents`, `SetActive(true)`. Content =
+  `UI/StoreManagerTabView` (a `MonoBehaviour` on a plain RectTransform container), built with
+  `UI/UiKit.cs` native uGUI — hire / adopt / assign stores / per-store budget+days steppers,
+  mirrors `StoreManagerOptions`. Fully guarded: any reflection miss → `BizManTabPatch.Disabled`,
+  tab off, panel + headless supervision unaffected. **UI is built blind (no live prefab access) —
+  expect a layout/polish pass after the first look.** The ModOptions panel stays as a fallback.
+  Team Leader will be a section inside this same tab.
 - ~~**HQ desk `suitableSkills`** append~~ **DONE 2026-09-02** (post-test feedback: user couldn't
   schedule the manager). `Interop/HqDeskAccess.cs` appends `sm:skill_storemanager` to the three
   desk items' `suitableSkills`, re-applied from a Harmony postfix on `ItemsGetter.OnItemsLoaded`

@@ -1,4 +1,22 @@
-# v3 Phase A — the one in-game test
+# v3 Phase A + B — in-game test
+
+## Phase B (new 2026-09-02): the HQ "Filiaalmanagers" tab
+
+Open **BizMan → your HQ**. There should be a **"Filiaalmanagers"** tab next to *Purchasing
+Agents* / *HR Managers* / *Logistics*. Everything the Mods-settings panel does is now in there:
+hire, pick a manager (must be scheduled at an HQ desk first — same as a Purchasing Agent),
+assign stores, set per-store weekly budget (− / +) and target days (− / +).
+
+The `[SKILLPROBE]` log prints `V3 BizManTabPatch Available / Patched / Disabled`. If `Disabled`
+is set, the tab is off and the Mods panel still does everything — tell me the reason.
+
+**Heads-up:** that tab's UI is built blind (I have no way to see the live game UI while coding),
+so the layout may be rough on the first look — spacing, button widths, a control that doesn't
+line up. Send a screenshot and I'll fix it. The logic underneath is the same tested code.
+
+---
+
+
 
 Deployed: the v3 `StoreManager` mod (custom `sm:skill_storemanager` skill + Harmony) **and** the
 headless `StoreManagerProbe` alongside it. One launch covers everything.
