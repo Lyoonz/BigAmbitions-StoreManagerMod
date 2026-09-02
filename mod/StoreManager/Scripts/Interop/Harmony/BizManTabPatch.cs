@@ -201,19 +201,14 @@ namespace StoreManager.Interop.Harmony
                     // vanilla tabs fade in via a CanvasGroup — a clone inherits alpha 0 / no raycasts
                     var cg = cGo.GetComponent<CanvasGroup>();
                     if (cg != null) { cg.alpha = 1f; cg.interactable = true; cg.blocksRaycasts = true; }
-                    // a nested Canvas with overrideSorting could bury it
-                    var nested = cGo.GetComponent<Canvas>();
-                    if (nested != null) UnityEngine.Object.DestroyImmediate(nested);
 
-                    // force full-stretch inside `containers` (all vanilla tab containers fill it)
-                    var rt = (RectTransform)cGo.transform;
-                    rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
-                    rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
-                    rt.localScale = Vector3.one;
+                    // keep the clone's RectTransform exactly as the vanilla PurchasingAgents container
+                    // (Instantiate already copied it) — only normalise scale.
+                    ((RectTransform)cGo.transform).localScale = Vector3.one;
 
-                    Debug.Log("[StoreManager] tab clone components: " +
-                        string.Join(", ", System.Array.ConvertAll(cGo.GetComponents<Component>(), c => c.GetType().Name)) +
-                        $" (canvasGroup={(cg != null ? cg.alpha.ToString() : "none")})");
+                    var rr = ((RectTransform)cGo.transform).rect;
+                    Debug.Log($"[StoreManager] tab clone: rect={rr.size} comps=[" +
+                        string.Join(", ", System.Array.ConvertAll(cGo.GetComponents<Component>(), c => c.GetType().Name)) + "]");
                 }
                 else
                 {

@@ -111,7 +111,7 @@ namespace StoreManager.UI
                         Announce(dir.AdoptManager(hq.Address, cid));
                         Rebuild();
                     }, 30f);
-                    UiKit.FixedWidth(btn.gameObject, 190f);
+                    UiKit.FixedWidth(btn.gameObject, 240f);
                 }
                 return;
             }
@@ -128,7 +128,7 @@ namespace StoreManager.UI
                 Feedback.Toast(Feedback.Level.Info, "storemanager_notify_ok", D("Manager removed."));
                 Rebuild();
             }, 30f);
-            UiKit.FixedWidth(drop.gameObject, 120f);
+            UiKit.FixedWidth(drop.gameObject, 150f);
 
             int cap = GameApi.MaxStores(plan.HqAddress, plan.ManagerEmployeeId);
             UiKit.Label(_content, string.Format("storemanager_bizmantab_cap".L("Supervising {0} of {1} stores (skill cap)"),
@@ -161,14 +161,14 @@ namespace StoreManager.UI
                         else Announce(dir.AssignStore(plan.ManagerEmployeeId, addr));
                         Rebuild();
                     }, 28f, supervised ? UiKit.AccentColor : UiKit.ButtonColor);
-                UiKit.FixedWidth(tgl.gameObject, 150f);
+                UiKit.FixedWidth(tgl.gameObject, 210f);
 
                 if (supervised && a != null)
                 {
                     var lim = UiKit.Row(_content.transform, 6f, 28f);
-                    UiKit.FixedWidth(UiKit.Label(lim.transform, "storemanager_opt_def_budget".L("Weekly budget"), 13f, UiKit.MutedColor).gameObject, 130f);
+                    UiKit.FixedWidth(UiKit.Label(lim.transform, "storemanager_opt_def_budget".L("Weekly budget"), 13f, UiKit.MutedColor).gameObject, 160f);
                     MoneyStepper(lim.transform, a, dir, plan);
-                    UiKit.FixedWidth(UiKit.Label(lim.transform, "storemanager_opt_def_days".L("Target days"), 13f, UiKit.MutedColor).gameObject, 100f);
+                    UiKit.FixedWidth(UiKit.Label(lim.transform, "storemanager_opt_def_days".L("Target days"), 13f, UiKit.MutedColor).gameObject, 130f);
                     DayStepper(lim.transform, a, dir, plan);
                 }
             }
