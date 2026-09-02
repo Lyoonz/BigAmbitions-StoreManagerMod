@@ -2,11 +2,37 @@
 
 Read this first, then `docs/DESIGN-v3.md`, then `DECISIONS.md` (esp. D15).
 
-## State (2026-09-02) — v3 Phase A coded
+## State (2026-09-02) — v3 Phase A + B DONE, tested in-game
 
-v2 (`ba:skill_purchasingagent` reuse) passed its in-game SelfTest. The user then rejected reuse:
-they want **two genuinely new native roles** — Filiaalmanager + Team Leader. See `docs/DESIGN-v3.md`
-and D15.
+The **Filiaalmanager** (Store Manager) role is fully working in-game. Remaining: **Team Leader**
++ departments (the second role, still deferred).
+
+### Phase B — done & user-verified in-game
+- **Custom skill** `sm:skill_storemanager` (primary, D15). Wage lands ~$28–37 (base 46).
+- **Recruit via the vanilla Recruitment Agency** — `Interop/Harmony/RecruitmentPatch.cs` postfixes
+  `UI.Dialog.RecruitmentSettings.SelectBusiness` and appends the skill to `businessSkills` when the
+  player's HQ is selected (no shared `employeePrimarySkills` / agency-settings mutation → zero AI
+  contamination). Then schedule at an HQ desk (`Interop/HqDeskAccess.cs` appends the skill to the
+  3 desk items' `suitableSkills` via `ItemsGetter.OnItemsLoaded` postfix + city-load backstop).
+- **HQ BizMan tab "Filiaalmanagers"** — `Interop/Harmony/BizManTabPatch.cs` (postfix on
+  `BizManBusiness.SetUpTabs`: clone the `PurchasingAgents` menu button, insert id into `_tabs`,
+  container = a clone of the vanilla `PurchasingAgents` container stripped of scripts/children,
+  hosting `UI/StoreManagerTabView`). Native uGUI via `UI/UiKit.cs` (game `Colors` palette, ~2×
+  scale, section-rule headers, `[− field +]` steppers). Content: recruit hint, manager adopt,
+  per-store Assign/Supervising, and 3 aligned steppers — Weekly budget / Keep stock for N days /
+  Order extra %.
+- **HQ landing-card counter** — `Interop/Harmony/HqCardPatch.cs` (postfix on
+  `HeadquartersList.SetUpEntry`). Gotcha solved: the counter row uses `EqualWidthLabelGroup` with a
+  *serialized* label list — the clone's Count + name labels must be `.Add`ed to those lists +
+  `ScheduleMatch()` re-invoked, or the row renders left-shifted.
+- **Safety margin %** — `StoreAssignment.SafetyMarginPercent` (+ `GlobalDefaults`), applied in
+  `DeliveryContracts.ComputeTarget` before the budget cap.
+- **Mods panel** — slimmed to: "Filiaalmanager — standaard voor nieuwe winkels" header, 3 default
+  sliders, "Veilig verwijderen" dropdown. Full manager/store controls only appear as a fallback
+  when `BizManTabPatch.Patched == false`.
+- `RoleSystemState.Summary()` reports: desks / HQ tab / agency / hq-card status.
+
+### Phase A (earlier the same day)
 
 - **Skill probe** (`probe/StoreManagerProbe/SKILL-PROBE.md`, run 2026-09-02): runtime `SkillData` +
   `BuildTagCache()` are safe; a mod-skill **primary** bricks a folder-deleted save (load-time
@@ -23,8 +49,9 @@ and D15.
   Bundled `mod/StoreManager/Dependencies/` (Harmony 2.10.2 + MonoMod/Cecil, from the user's
   LowerInstallationFee mod). Locales: `sm:skill_storemanager` → Store Manager/Filiaalmanager.
   `ContractSnapshot`/`OriginalContract`/`PendingRestore` **kept** (working+tested — deferred cut).
-- **Next: the one in-game test** — `docs/PHASE-A-TEST.md`. Probe + mod deployed. If green, then
-  the deferred list in `docs/DESIGN-v3.md` (Team Leader, HQ BizMan tab, desk `suitableSkills`).
+- **Next up**: **Team Leader** + departments (second native role — `sm:skill_teamleader`, a
+  5-field `Department` record, flat pro-rata trim, as a drill-down section inside the same HQ tab).
+  See `docs/DESIGN-v3.md` "Deferred".
 
 ---
 
